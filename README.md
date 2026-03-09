@@ -94,7 +94,7 @@ sudo pacman -S make git
 
 ```bash
 # 1. Clonar el repositorio
-git clone <url-del-repositorio> Minerva
+git clone https://github.com/SMR-08/Minerva.git Minerva
 cd Minerva
 
 # 2. Inicialización completa (un solo comando)
