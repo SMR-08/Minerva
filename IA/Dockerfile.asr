@@ -1,0 +1,36 @@
+FROM nvcr.io/nvidia/pytorch:24.02-py3
+
+LABEL maintainer="mmaygir1509@g.educaan.es"
+LABEL description="API para procesamiento de audio ARS (Qwen3-ASR + Diarizacion) con GPU."
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV TOKENIZERS_PARALLELISM=false
+
+RUN echo "--- Actualizando sistema... ---" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "--- Sistema actualizado. ---"
+
+RUN echo "--- Instalando dependencias Python... ---" && \
+    pip install --no-cache-dir \
+    # Librerias de la API y Red:
+    fastapi \
+    "uvicorn[standard]" \
+    requests \
+    # Modelo ASR Qwen3:
+    qwen-asr \
+    # Utilidades de audio:
+    soundfile \
+    && echo "--- Dependencias instaladas. ---"
+
+# FlashAttention 2 para acelerar la inferencia del modelo
+RUN MAX_JOBS=4 pip install --no-cache-dir flash-attn --no-build-isolation || \
+    echo "AVISO: flash-attn no instalado. Inferencia seguira funcionando sin aceleracion extra."
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

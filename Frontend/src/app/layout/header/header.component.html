@@ -1,0 +1,17 @@
+<header>
+    <!-- Left: Logo -->
+    <a routerLink="/" class="logo">Minerva</a>
+
+    <!-- Right: Navigation -->
+    <nav class="nav-links">
+        <a routerLink="/subir" routerLinkActive="active">Subir</a>
+        <ng-container *ngIf="authService.isLoggedIn(); else notLoggedIn">
+            <!-- <a routerLink="/cuenta" routerLinkActive="active">Cuenta</a> (WIP) -->
+            <button (click)="logout()" class="btn-logout">Salir</button>
+        </ng-container>
+        <ng-template #notLoggedIn>
+            <a routerLink="/login" routerLinkActive="active">Ingresar</a>
+            <a routerLink="/registro" routerLinkActive="active">Registrarse</a>
+        </ng-template>
+    </nav>
+</header>

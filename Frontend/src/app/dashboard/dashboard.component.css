@@ -1,0 +1,327 @@
+:host {
+    display: block;
+    width: 85vw;
+    font-family: 'Inter', sans-serif;
+
+    /* Variables de Color */
+    --color-fondo: #f8fafc;
+    --color-texto: #1e293b;
+    --color-titulo: #0f172a;
+    --color-subtitulo: #64748b;
+    --color-tiempo: #94a3b8;
+    --color-borde: #cbd5e1;
+
+    --azul: #3b82f6;
+    --azul-bg: #eff6ff;
+    --amarillo: #eab308;
+    --amarillo-bg: #fefce8;
+    --verde: #22c55e;
+    --verde-bg: #f0fdf4;
+    --gris: #94a3b8;
+    --gris-bg: #f8fafc;
+
+    padding: 2rem;
+    background-color: var(--color-fondo);
+    min-height: 100vh;
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--color-titulo);
+}
+
+.contenedor-principal {
+    max-width: 1200px;
+    display: grid;
+    gap: 3rem;
+    margin: 0 auto;
+}
+
+/* Sección Actividad */
+.lista-actividades {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.item-actividad {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+    transition: transform 0.2s ease;
+}
+
+.item-actividad:hover {
+    transform: translateY(-2px);
+}
+
+.icono-wrapper {
+    width: 48px;
+    height: 48px;
+    background-color: #f1f5f9;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+}
+
+.icono-wrapper svg {
+    width: 24px;
+    height: 24px;
+}
+
+.info-texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.titulo-item {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-titulo);
+}
+
+.subtitulo-item {
+    font-size: 0.875rem;
+    color: var(--color-subtitulo);
+    font-weight: 500;
+}
+
+.tiempo {
+    font-size: 0.875rem;
+    color: var(--color-tiempo);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Sección Asignaturas */
+.grid-asignaturas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+.tarjeta-asignatura {
+    background: white;
+    border-radius: 16px;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 160px;
+}
+
+.tarjeta-asignatura:hover {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transform: translateY(-4px);
+}
+
+.icono-carpeta {
+    width: 54px;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icono-carpeta svg {
+    width: 40px;
+    height: 40px;
+}
+
+.nombre-asignatura {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-texto);
+}
+
+/* Botón Eliminar */
+.tarjeta-asignatura {
+    position: relative;
+}
+
+.btn-eliminar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fee2e2;
+    color: #ef4444;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-eliminar svg {
+    width: 16px;
+    height: 16px;
+}
+
+.tarjeta-asignatura:hover .btn-eliminar {
+    opacity: 1;
+}
+
+.btn-eliminar:hover {
+    background: #fecaca;
+    transform: scale(1.1);
+}
+
+/* Crear Nueva */
+.tarjeta-nueva {
+    background: transparent;
+    border: 2px dashed var(--color-borde);
+    box-shadow: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.tarjeta-nueva:hover {
+    border-color: var(--azul);
+    background-color: var(--azul-bg);
+    transform: translateY(-4px);
+}
+
+.icono-carpeta.nueva {
+    background-color: var(--azul-bg);
+    color: var(--azul);
+    border-radius: 12px;
+}
+
+.icono-carpeta.nueva svg {
+    width: 32px;
+    height: 32px;
+}
+
+/* Colores de Carpetas */
+.icono-carpeta {
+    border-radius: 12px;
+}
+
+/* Vista de Temas */
+.encabezado-temas {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.encabezado-temas h2 {
+    margin-bottom: 0;
+}
+
+.btn-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1px solid var(--color-borde);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-subtitulo);
+    cursor: pointer;
+    transition: all 0.2s;
+    width: fit-content;
+}
+
+.btn-volver svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-volver:hover {
+    background: #f8fafc;
+    color: var(--color-texto);
+    border-color: var(--color-subtitulo);
+}
+
+/* Detalle Transcripción */
+.transcripcion-header {
+    margin-top: -0.5rem;
+}
+
+.meta-fecha {
+    font-size: 0.825rem;
+    color: var(--color-tiempo);
+}
+
+.conversacion-container {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.segmento-voz {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px hide solid #f1f5f9;
+}
+
+.segmento-voz:last-child {
+    border-bottom: none;
+}
+
+.hablante-tag {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--azul);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.timestamp {
+    font-weight: 400;
+    color: var(--color-tiempo);
+    font-size: 0.75rem;
+}
+
+.texto-segmento {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--color-texto);
+    margin: 0;
+}
+
+.trans-item {
+    cursor: pointer;
+}
+
+.trans-item:hover {
+    background-color: var(--azul-bg);
+}
+
+.fallback-texto {
+    font-style: italic;
+    color: var(--color-subtitulo);
+    line-height: 1.8;
+}
