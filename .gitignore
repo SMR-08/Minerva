@@ -1,0 +1,60 @@
+# ==============================================================================
+# Minerva - Git Ignore Global
+# ==============================================================================
+
+# --- Variables de Entorno (Secretos) ---
+.env
+!.env.example
+
+# --- Dependencias ---
+node_modules/
+vendor/
+.angular/
+
+# --- Builds ---
+Frontend/dist/
+Backend/public/build/
+
+# --- Cachés de IA (Pesos de Modelos) ---
+IA/datos/cache_hf/
+IA/datos/cache_torch/
+
+# --- Archivos compartidos (datos de usuario) ---
+Shared/entrada/*
+Shared/salida/*
+!Shared/entrada/.gitkeep
+!Shared/salida/.gitkeep
+
+# --- Docker ---
+db_data/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Laravel ---
+Backend/storage/logs/*
+Backend/storage/framework/cache/*
+Backend/storage/framework/sessions/*
+Backend/storage/framework/views/*
+Backend/bootstrap/cache/*
+!Backend/storage/logs/.gitkeep
+!Backend/storage/framework/cache/.gitkeep
+!Backend/storage/framework/sessions/.gitkeep
+!Backend/storage/framework/views/.gitkeep
+!Backend/bootstrap/cache/.gitkeep
+
+# --- Angular ---
+Frontend/.angular/
+
+# --- Logs ---
+*.log
+npm-debug.log*

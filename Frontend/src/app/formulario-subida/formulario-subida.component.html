@@ -1,0 +1,105 @@
+<div class="formulario-contenedor">
+  <h2>Subir Archivo de Audio</h2>
+  
+  <form (ngSubmit)="onSubmit()" #audioForm="ngForm">
+    <!-- Campo Nombre -->
+    <div class="form-group">
+      <label for="nombre">Nombre:</label>
+      <input 
+        type="text" 
+        id="nombre" 
+        name="nombre"
+        [(ngModel)]="formulario.nombre"
+        required
+        placeholder="Ingrese el nombre del audio"
+        class="form-control"
+      >
+      <small *ngIf="formulario.nombre === ''" class="error">El nombre es requerido</small>
+    </div>
+
+    <!-- Selector Asignatura -->
+    <div class="form-group">
+      <label for="asignatura">Asignatura:</label>
+      <select 
+        id="asignatura" 
+        name="asignatura"
+        [(ngModel)]="formulario.id_asignatura"
+        (change)="onAsignaturaChange()"
+        class="form-control"
+        required
+      >
+        <option [ngValue]="null">-- Seleccione una asignatura --</option>
+        <option *ngFor="let asig of asignaturas" [ngValue]="asig.id_asignatura">
+          {{ asig.nombre }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Selector Tema -->
+    <div class="form-group">
+      <label for="tema">Tema:</label>
+      <select 
+        id="tema" 
+        name="tema"
+        [(ngModel)]="formulario.id_tema"
+        class="form-control"
+        [disabled]="!formulario.id_asignatura"
+        required
+      >
+        <option [ngValue]="null">-- Seleccione un tema --</option>
+        <option *ngFor="let tema of temasFiltrados" [ngValue]="tema.id_tema">
+          {{ tema.nombre }}
+        </option>
+      </select>
+      <small *ngIf="formulario.id_asignatura && temasFiltrados.length === 0" class="error">
+        No hay temas disponibles para esta asignatura
+      </small>
+    </div>
+
+    <!-- Campo de Archivo de Audio -->
+    <div class="form-group">
+      <label for="archivo">Archivo de Audio:</label>
+      <input 
+        type="file" 
+        id="archivo" 
+        name="archivo"
+        (change)="onFileSelected($event)"
+        accept="audio/*"
+        required
+        class="form-control"
+        [disabled]="cargando"
+      >
+      <small *ngIf="archivoSeleccionado" class="archivo-info">
+        Archivo: {{ archivoSeleccionado.name }}
+      </small>
+      <small *ngIf="!archivoSeleccionado && enviado" class="error">
+        Debe seleccionar un archivo
+      </small>
+    </div>
+
+    <!-- Botón Subir -->
+    <div class="form-actions">
+      <button 
+        type="submit" 
+        [disabled]="!formulario.nombre || !archivoSeleccionado || !formulario.id_tema || cargando"
+        class="btn-subir"
+      >
+        <span *ngIf="!cargando">Subir y Procesar</span>
+        <span *ngIf="cargando">Procesando...</span>
+      </button>
+      <button 
+        type="reset" 
+        class="btn-limpiar"
+        (click)="onLimpiar()"
+        [disabled]="cargando"
+      >
+        Limpiar
+      </button>
+    </div>
+
+    <!-- Mensaje de estado -->
+    <div *ngIf="mensaje" [ngClass]="{'mensaje-exito': !error, 'mensaje-error': error, 'mensaje-info': cargando}">
+      {{ mensaje }}
+    </div>
+  </form>
+</div>

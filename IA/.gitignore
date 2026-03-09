@@ -1,0 +1,32 @@
+# Entorno virtual y cache
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Variables de entorno
+.env
+
+# Datos de Audio
+audios/entrada/*
+!audios/entrada/.gitkeep
+audios/salida/*
+!audios/salida/.gitkeep
+transcripciones/*
+!transcripciones/.gitkeep
+
+# Cache persistente Docker (modelos IA, pip, etc.)
+datos/
+
+# IDEs
+.vscode/
+.idea/
+
+# Carpetas antiguas (por seguridad si quedan residuos)
+ASR/__pycache__
+DIARIZADOR/__pycache__
+VAD/__pycache__
+conversacion.json
+timestamp.json
+transcripcion.txt

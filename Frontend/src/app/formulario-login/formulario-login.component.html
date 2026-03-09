@@ -1,0 +1,48 @@
+<app-header></app-header>
+
+<main class="main-content">
+  <div class="formulario-contenedor">
+    <h2>Ingreso</h2>
+
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
+      <div class="form-group">
+        <label for="email">Correo Electrónico:</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          [(ngModel)]="formulario.email"
+          required
+          placeholder="Ingrese su correo electrónico"
+          class="form-control"
+        />
+        <small *ngIf="formulario.email === '' && enviado" class="error">El correo es requerido</small>
+      </div>
+
+      <div class="form-group">
+        <label for="contrasena">Contraseña:</label>
+        <input
+          type="password"
+          id="contrasena"
+          name="contrasena"
+          [(ngModel)]="formulario.contrasena"
+          required
+          placeholder="Ingrese su contraseña"
+          class="form-control"
+        />
+        <small *ngIf="formulario.contrasena === '' && enviado" class="error">La contraseña es requerida</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-registrar" [disabled]="!formulario.email || !formulario.contrasena">Ingresar</button>
+        <button type="button" class="btn-limpiar" (click)="onLimpiar()">Limpiar</button>
+      </div>
+
+      <div *ngIf="mensaje" [ngClass]="{'mensaje-exito': !error, 'mensaje-error': error}">
+        {{ mensaje }}
+      </div>
+    </form>
+  </div>
+</main>
+
+<app-footer></app-footer>

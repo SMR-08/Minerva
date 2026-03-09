@@ -1,0 +1,42 @@
+FROM nvidia/cuda:12.9.0-runtime-ubuntu24.04
+
+LABEL maintainer="mmaygir1509@g.educaan.es"
+LABEL description="Servicio de diarizacion de audio con Senko (ultra-rapido)."
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 1. Dependencias del sistema: ffmpeg + libs dev (torchcodec), gcc/cmake (compilacion nativa Senko)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg libavutil-dev libavcodec-dev libavformat-dev libswresample-dev \
+    gcc g++ git curl cmake \
+    && ldconfig \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Instalar uv (gestor de paquetes recomendado por Senko, incluye gestion de Python)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# 3. Instalar Python 3.13 via uv (no depende de repos de Ubuntu)
+RUN uv python install 3.13
+
+# 4. Crear venv con Python 3.13 e instalar Senko + dependencias web
+#    NOTA: pyannote-audio>=3.4 usa torchcodec (ABI incompatible con PyTorch 2.8 + FFmpeg 6).
+#    Pinamos a 3.3.2 que usa torchaudio (ya incluido por Senko).
+RUN uv venv --python 3.13 /app/.venv && \
+    . /app/.venv/bin/activate && \
+    uv pip install "pyannote-audio==3.3.2" && \
+    uv pip install "git+https://github.com/narcotic-sh/senko.git[nvidia]" && \
+    uv pip install fastapi "uvicorn[standard]" matplotlib
+
+
+# 5. Activar venv por defecto
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

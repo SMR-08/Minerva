@@ -1,0 +1,144 @@
+/* Sección carpetas */
+
+.grid-carpetas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--color-titulo);
+}
+
+.tarjeta-carpeta {
+    background: white;
+    border-radius: 16px;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 160px;
+
+}
+
+.tarjeta-carpeta:hover {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transform: translateY(-4px);
+}
+
+.icono-carpeta {
+    width: 54px;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icono-carpeta svg {
+    width: 40px;
+    height: 40px;
+}
+
+.nombre-carpeta {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-texto);
+}
+
+/* Colores de Carpetas */
+.carpeta-azul {
+    color: var(--azul);
+    background-color: var(--azul-bg);
+    border-radius: 12px;
+}
+
+.carpeta-amarilla {
+    color: var(--amarillo);
+    background-color: var(--amarillo-bg);
+    border-radius: 12px;
+}
+
+.carpeta-verde {
+    color: var(--verde);
+    background-color: var(--verde-bg);
+    border-radius: 12px;
+}
+
+.carpeta-gris {
+    color: var(--gris);
+    background-color: var(--gris-bg);
+    border-radius: 12px;
+}
+
+/* Crear Nueva */
+.crear-nueva {
+    background: transparent;
+    border: 2px dashed var(--color-borde);
+    box-shadow: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.crear-nueva:hover {
+    border-color: var(--color-subtitulo);
+    background-color: #f1f5f9;
+    transform: none;
+}
+
+/* Vista detalle carpeta */
+.vista-carpeta {
+    width: 100%;
+}
+
+.cabecera-carpeta {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.boton-volver {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: white;
+    border: 1px solid var(--color-borde);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--color-subtitulo);
+    transition: all 0.2s;
+}
+
+.boton-volver:hover {
+    background-color: #f8fafc;
+    color: var(--color-texto);
+}
+
+.boton-volver svg {
+    width: 20px;
+    height: 20px;
+}
+
+.cabecera-carpeta h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-titulo);
+    margin: 0;
+}
+
+.contenido-carpeta {
+    background: var(--color-fondo);
+    border-radius: 16px;
+    padding: 2rem;
+    min-height: 400px;
+}

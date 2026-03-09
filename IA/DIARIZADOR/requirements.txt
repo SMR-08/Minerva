@@ -1,0 +1,4 @@
+pyannote-audio
+fastapi
+uvicorn
+python-multipart
