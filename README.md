@@ -186,15 +186,17 @@ make clean            # 🧹 Limpiar todo (contenedores, volúmenes, imágenes)
 
 ## 🌐 Servicios y Puertos
 
-| Servicio | Puerto Host | Puerto Interno | Contenedor |
-|---|---|---|---|
-| **Frontend (Angular)** | `4200` | `4200` | `minerva-frontend` |
-| **Backend (Laravel API)** | `8001` | `80` | `minerva-nginx` |
-| **Base de Datos (MariaDB)** | `3307` | `3306` | `minerva-db` |
-| **IA - ASR** | `8002` | `8000` | `minerva-asr` |
-| **IA - Diarizador** | — | `8000` | `minerva-diarizador` |
+| Servicio | Puerto Host | Puerto Interno | Contenedor | Acceso |
+|---|---|---|---|---|
+| **Frontend (Angular)** | `4200` | `4200` | `minerva-frontend` | `http://localhost:4200` |
+| **Backend (Laravel API)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/api` |
+| **Panel Admin (Laravel)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/admin` |
+| **Base de Datos (MariaDB)** | `3307` | `3306` | `minerva-db` | `localhost:3307` |
+| **IA - ASR** | `8002` | `8000` | `minerva-asr` | `http://localhost:8002` |
+| **IA - Diarizador** | — | `8000` | `minerva-diarizador` | Solo interno |
 
-> El Diarizador no expone puertos al host: sólo se comunica internamente con el ASR.
+> **Panel Admin:** Accede con `admin@minerva.com` / `admin123` para gestionar usuarios y sistema.  
+> **Diarizador:** No expone puertos al host, solo se comunica internamente con el ASR.
 
 ---
 

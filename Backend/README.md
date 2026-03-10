@@ -62,6 +62,39 @@ El archivo `.env` controla el comportamiento de la aplicación en los distintos 
 - Si usas Docker, la `AI_BACKEND_URL` debe apuntar a la red interna o usar `host.docker.internal` para acceder al host.
 - El volumen de audios debe estar sincronizado entre este Backend y el servicio de IA.
 
+---
+
+## 🔐 Panel de Administración
+
+El backend incluye un panel de administración web accesible en `/admin` con las siguientes características:
+
+### Acceso
+- **URL:** `http://localhost:8001/admin`
+- **Credenciales por defecto:** `admin@minerva.com` / `admin123`
+
+### Funcionalidades
+- ✅ Sistema de autenticación con sesiones web
+- ✅ Protección de rutas mediante middleware (`auth:web` + `es_admin`)
+- ✅ Verificación de rol administrador (id_rol = 1)
+- ✅ Funcionalidad "Recordar sesión"
+- ✅ Gestión de usuarios del sistema
+- ✅ Consola de debug para pruebas de IA
+- ✅ Dashboard con estadísticas del sistema
+
+### Seguridad
+- Las contraseñas se hashean con bcrypt (12 rounds)
+- CSRF protection habilitado en todos los formularios
+- Sesiones regeneradas después del login
+- Usuarios no-admin son rechazados automáticamente
+- Intended redirect: redirige a la página intentada después del login
+
+### Notas Técnicas
+- El sistema usa el modelo `Usuario` (tabla `usuarios`) en lugar del modelo `User` estándar de Laravel
+- Compatible con la autenticación API (Sanctum) sin conflictos
+- El middleware `EsAdmin` detecta automáticamente peticiones web vs API
+
+---
+
 ## 🛠️ Comandos Útiles
 
 ```bash
