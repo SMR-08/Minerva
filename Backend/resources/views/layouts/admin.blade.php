@@ -48,13 +48,20 @@
             <div class="p-4 border-t border-slate-800">
                 <div class="p-3 glass rounded-2xl flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
-                        <span class="text-sm font-bold text-slate-400">MA</span>
+                        <span class="text-sm font-bold text-slate-400">{{ strtoupper(substr(auth()->user()->nombre_completo ?? 'Admin', 0, 2)) }}</span>
                     </div>
                     <div class="flex-1 overflow-hidden">
                         <p class="text-sm font-semibold text-white truncate">{{ auth()->user()->nombre_completo ?? 'Admin' }}</p>
                         <p class="text-xs text-slate-500 truncate">Administrador</p>
                     </div>
                 </div>
+                <form method="POST" action="{{ route('admin.logout') }}" class="mt-3">
+                    @csrf
+                    <button type="submit" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        <span class="font-medium">Cerrar Sesión</span>
+                    </button>
+                </form>
             </div>
         </aside>
 

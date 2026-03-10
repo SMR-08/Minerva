@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-class Usuario extends Model
+class Usuario extends Authenticatable
 {
     use HasFactory, HasApiTokens;
 
@@ -25,6 +25,7 @@ class Usuario extends Model
 
     protected $hidden = [
         'password_hash',
+        'remember_token',
     ];
 
     // Auth Password override
