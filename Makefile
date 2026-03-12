@@ -9,7 +9,7 @@ export
 
 .PHONY: help init up down restart build logs status \
         migrate seed shell-backend shell-frontend \
-        clean permisos generar-env-laravel
+        clean permisos generar-env-laravel build-assets
 
 # --- Colores ---
 AZUL     := $(shell printf '\033[1;34m')
@@ -64,9 +64,14 @@ init: ## 🚀 Inicialización completa (primera vez): .env, build, up, dependenc
 	@# 7. Instalar dependencias de Composer
 	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"
 	docker compose exec laravel-app composer install --no-interaction
-	@# 8. Permisos de storage
+	@# 8. Instalar dependencias de npm y compilar assets
+	@echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"
+	cd Backend && npm install
+	@echo "$(AMARILLO)🔨 Compilando assets con Vite...$(RESET)"
+	cd Backend && npm run build
+	@# 9. Permisos de storage
 	@$(MAKE) permisos
-	@# 9. Ejecutar migraciones y seeders
+	@# 10. Ejecutar migraciones y seeders
 	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"
 	docker compose exec laravel-app php artisan migrate --force --seed
 	@echo ""
@@ -163,6 +168,11 @@ permisos: ## 🔐 Corregir permisos de storage de Laravel
 	docker compose exec laravel-app chown -R www-data:www-data storage bootstrap/cache
 	docker compose exec laravel-app chmod -R 775 storage bootstrap/cache
 	@echo "$(VERDE)✓ Permisos corregidos.$(RESET)"
+
+build-assets: ## 🎨 Compilar assets frontend con Vite
+	@echo "$(AMARILLO)🎨 Compilando assets con Vite...$(RESET)"
+	cd Backend && npm run build
+	@echo "$(VERDE)✓ Assets compilados.$(RESET)"
 
 # ==============================================================================
 # ACCESO A LOS CONTENEDORES
