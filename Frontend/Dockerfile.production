@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar TODAS las dependencias (necesarias para el build)
-RUN npm ci
+# Usar --force para ignorar incompatibilidades de plataforma en deps opcionales
+RUN npm ci --force
 
 # Copiar código fuente
 COPY . .
