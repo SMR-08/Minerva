@@ -19,7 +19,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => env('APP_ENV') === 'production' 
+        ? explode(',', env('CORS_ALLOWED_ORIGINS', 'http://150.214.56.73:9122'))
+        : ['*'],
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +31,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => env('APP_ENV') === 'production' ? true : false,
 
 ];
