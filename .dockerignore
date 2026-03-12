@@ -1,0 +1,61 @@
+# ==============================================================================
+# Minerva - Docker Ignore Global
+# ==============================================================================
+
+# Variables de Entorno (Secretos)
+.env
+.env.*
+!.env.example
+!.env.production
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Dependencias (se instalan en build)
+node_modules/
+vendor/
+
+# Builds y cachés
+Frontend/dist/
+Frontend/.angular/
+Backend/public/build/
+Backend/storage/logs/*
+Backend/storage/framework/cache/*
+Backend/storage/framework/sessions/*
+Backend/storage/framework/views/*
+Backend/bootstrap/cache/*
+
+# Cachés de IA
+IA/datos/
+
+# Archivos compartidos (datos de usuario)
+Shared/entrada/*
+Shared/salida/*
+
+# Docker
+db_data/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Documentación y tests
+*.md
+!README.md
+tests/
+*.test.js
+*.spec.ts
+
+# CI/CD
+.github/

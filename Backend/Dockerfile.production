@@ -1,0 +1,87 @@
+FROM php:8.4-fpm AS builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libzip-dev \
+    libicu-dev \
+    default-mysql-client \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Get Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+# Copy composer files
+COPY composer*.json ./
+
+# Install PHP dependencies (production only)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# Copy application code
+COPY . .
+
+# Install Node.js for asset compilation
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install \
+    && npm run build \
+    && apt-get remove -y nodejs \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Run post-install scripts
+RUN composer dump-autoload --optimize
+
+# ============================================================================
+# Stage 2: Production runtime
+# ============================================================================
+FROM php:8.4-fpm
+
+LABEL maintainer="mmaygir1509@g.educaan.es"
+LABEL description="Backend Laravel - Producción optimizada"
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libicu-dev \
+    default-mysql-client \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip opcache \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www
+
+# Copy application from builder
+COPY --from=builder /var/www /var/www
+
+# Create system user
+ARG user=minerva
+ARG uid=1000
+
+RUN useradd -G www-data,root -u $uid -d /home/$user $user && \
+    mkdir -p /home/$user/.composer && \
+    chown -R $user:$user /home/$user
+
+# Configure PHP for production
+COPY docker/php/production.ini /usr/local/etc/php/conf.d/production.ini
+
+# Set permissions
+RUN chown -R www-data:www-data storage bootstrap/cache && \
+    chmod -R 775 storage bootstrap/cache
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
