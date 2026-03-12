@@ -1,0 +1,41 @@
+# Vendor (se instala en build)
+vendor/
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Storage y logs
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+
+# Build artifacts
+public/build/
+public/hot
+
+# Tests
+tests/
+phpunit.xml
+.phpunit.result.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Documentation
+*.md
+!README.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore

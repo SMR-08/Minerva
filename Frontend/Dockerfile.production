@@ -1,0 +1,37 @@
+FROM node:20-alpine AS builder
+
+LABEL maintainer="mmaygir1509@g.educaan.es"
+LABEL description="Frontend Angular - Build de producción"
+
+WORKDIR /app
+
+# Copiar package files
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm ci --only=production --ignore-scripts
+
+# Copiar código fuente
+COPY . .
+
+# Build de producción
+RUN npm run build -- --configuration production
+
+# ============================================================================
+# Stage 2: Nginx para servir archivos estáticos
+# ============================================================================
+FROM nginx:alpine
+
+LABEL maintainer="mmaygir1509@g.educaan.es"
+LABEL description="Frontend Angular - Servidor de producción"
+
+# Copiar build desde stage anterior
+COPY --from=builder /app/dist/minerva-proyecto/browser /usr/share/nginx/html
+
+# Copiar configuración de nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Exponer puerto 80 (interno)
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
