@@ -9,7 +9,7 @@ export
 
 .PHONY: help init up down restart build logs status \
         migrate seed shell-backend shell-frontend \
-        clean permisos generar-env-laravel
+        clean permisos generar-env-laravel build-assets
 
 # --- Colores ---
 AZUL     := $(shell printf '\033[1;34m')
@@ -41,32 +41,37 @@ init: ## 🚀 Inicialización completa (primera vez): .env, build, up, dependenc
 	else \
 		echo "$(VERDE)✓ .env ya existe.$(RESET)"; \
 	fi
-	@# 2. Generar .env de Laravel desde el .env global
+	@# 2. Verificar y generar APP_KEY si está vacía
+	@if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
+		echo "$(AMARILLO)🔑 Generando APP_KEY...$(RESET)"; \
+		NEW_KEY="base64:$$(openssl rand -base64 32)"; \
+		sed -i "s|^APP_KEY=.*|APP_KEY=$$NEW_KEY|" .env; \
+		echo "$(VERDE)✓ APP_KEY generada en .env raíz.$(RESET)"; \
+	else \
+		echo "$(VERDE)✓ APP_KEY ya configurada.$(RESET)"; \
+	fi
+	@# 3. Generar .env de Laravel desde el .env global
 	@$(MAKE) generar-env-laravel
-	@# 3. Crear carpetas compartidas
+	@# 4. Crear carpetas compartidas
 	@mkdir -p Shared/entrada Shared/salida
 	@echo "$(VERDE)✓ Carpetas compartidas creadas.$(RESET)"
-	@# 4. Construir imágenes
+	@# 5. Construir imágenes
 	@echo "$(AMARILLO)🐳 Construyendo imágenes Docker...$(RESET)"
 	docker compose build
-	@# 5. Levantar servicios
+	@# 6. Levantar servicios
 	@echo "$(AMARILLO)🐳 Levantando servicios...$(RESET)"
 	docker compose up -d
-	@# 6. Instalar dependencias de Composer
+	@# 7. Instalar dependencias de Composer
 	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"
 	docker compose exec laravel-app composer install --no-interaction
-	@# 7. Generar APP_KEY de Laravel y sincronizar al .env raíz
-	@echo "$(AMARILLO)🔑 Generando APP_KEY de Laravel...$(RESET)"
-	docker compose exec laravel-app php artisan key:generate
-	@# Sincronizar la APP_KEY generada de vuelta al .env raíz
-	@NEW_KEY=$$(grep '^APP_KEY=' Backend/.env | head -1); \
-	if [ -n "$$NEW_KEY" ]; then \
-		sed -i "s|^APP_KEY=.*|$$NEW_KEY|" .env; \
-		echo "$(VERDE)✓ APP_KEY sincronizada al .env raíz.$(RESET)"; \
-	fi
-	@# 8. Permisos de storage
+	@# 8. Instalar dependencias de npm y compilar assets
+	@echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"
+	cd Backend && npm install
+	@echo "$(AMARILLO)🔨 Compilando assets con Vite...$(RESET)"
+	cd Backend && npm run build
+	@# 9. Permisos de storage
 	@$(MAKE) permisos
-	@# 9. Ejecutar migraciones y seeders
+	@# 10. Ejecutar migraciones y seeders
 	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"
 	docker compose exec laravel-app php artisan migrate --force --seed
 	@echo ""
@@ -163,6 +168,11 @@ permisos: ## 🔐 Corregir permisos de storage de Laravel
 	docker compose exec laravel-app chown -R www-data:www-data storage bootstrap/cache
 	docker compose exec laravel-app chmod -R 775 storage bootstrap/cache
 	@echo "$(VERDE)✓ Permisos corregidos.$(RESET)"
+
+build-assets: ## 🎨 Compilar assets frontend con Vite
+	@echo "$(AMARILLO)🎨 Compilando assets con Vite...$(RESET)"
+	cd Backend && npm run build
+	@echo "$(VERDE)✓ Assets compilados.$(RESET)"
 
 # ==============================================================================
 # ACCESO A LOS CONTENEDORES
