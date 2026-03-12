@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.9.0-runtime-ubuntu24.04
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
 LABEL maintainer="mmaygir1509@g.educaan.es"
 LABEL description="Servicio de diarizacion de audio con Senko (ultra-rapido)."
