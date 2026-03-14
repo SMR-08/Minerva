@@ -12,6 +12,7 @@
 - [Configuración (.env)](#-configuración-env)
 - [Carpeta Compartida (Shared)](#-carpeta-compartida-shared)
 - [Comandos Disponibles (Make)](#-comandos-disponibles-make)
+- [Producción y despliegue distribuido](#-producción-y-despliegue-distribuido)
 - [Servicios y Puertos](#-servicios-y-puertos)
 - [API del Backend Laravel](#-api-del-backend-laravel)
 - [API del Backend IA](#-api-del-backend-ia)
@@ -181,6 +182,21 @@ make shell-db         # 🐚 Consola MariaDB
 make permisos         # 🔐 Corregir permisos de storage
 make clean            # 🧹 Limpiar todo (contenedores, volúmenes, imágenes)
 ```
+
+---
+
+## 🚀 Producción y despliegue distribuido
+
+- Switch `DEV=1/0` en el `Makefile`:
+  - `DEV=1` (default): `docker-compose.yml` (desarrollo)
+  - `DEV=0`: `docker-compose.production.yml` (producción)
+
+- En producción puedes levantar componentes por separado con `profiles`:
+  - `DEV=0 make front-up` (gateway + frontend)
+  - `DEV=0 make back-up` (backend + BD)
+  - `DEV=0 make ia-up` (IA)
+
+Guía completa: `docs/DEPLOYMENT.md`.
 
 ---
 

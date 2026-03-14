@@ -7,8 +7,24 @@
 -include .env
 export
 
-.PHONY: help init up down restart build logs status \
-        migrate seed shell-backend shell-frontend \
+# ==============================================================================
+# MODO
+# DEV=1 (por defecto) usa docker-compose.yml (desarrollo)
+# DEV=0 usa docker-compose.production.yml (producción)
+# ==============================================================================
+DEV ?= 1
+
+ifeq ($(DEV),0)
+COMPOSE_FILE := docker-compose.production.yml
+else
+COMPOSE_FILE := docker-compose.yml
+endif
+
+DC := docker compose -f $(COMPOSE_FILE)
+
+.PHONY: help mode init up down restart build logs status \
+        front-up front-down front-logs back-up back-down back-logs ia-up ia-down ia-logs \
+        migrate seed shell-backend shell-frontend shell-db \
         clean permisos generar-env-laravel build-assets
 
 # --- Colores ---
@@ -24,22 +40,48 @@ help: ## Mostrar esta ayuda
 	@echo "$(AZUL)║     🦉 Minerva - Comandos Disponibles    ║$(RESET)"
 	@echo "$(AZUL)╚══════════════════════════════════════════╝$(RESET)"
 	@echo ""
+	@echo "Modo actual: DEV=$(DEV) (compose: $(COMPOSE_FILE))"
+	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(VERDE)%-20s$(RESET) %s\n", $$1, $$2}'
+	@echo ""
+
+mode: ## Mostrar modo actual (DEV=1/0) y compose activo
+	@echo "DEV=$(DEV)"
+	@echo "COMPOSE_FILE=$(COMPOSE_FILE)"
+	@echo "DC=$(DC)"
+	@echo ""
+	@echo "Ejemplos:"
+	@echo "  make up"
+	@echo "  DEV=0 make back-up"
+	@echo "  DEV=0 make ia-up"
 	@echo ""
 
 # ==============================================================================
 # INICIALIZACIÓN COMPLETA
 # ==============================================================================
 
-init: ## 🚀 Inicialización completa (primera vez): .env, build, up, dependencias, migraciones
+init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 	@echo "$(AZUL)═══ 🚀 Inicializando Minerva... ═══$(RESET)"
-	@# 1. Crear .env global si no existe
-	@if [ ! -f .env ]; then \
-		echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
-		cp .env.example .env; \
+	@if [ "$(DEV)" = "0" ]; then \
+		echo "$(AMARILLO)Modo producción (DEV=0): asegúrate de haber copiado .env.production.example -> .env$(RESET)"; \
+		if [ ! -f .env ]; then \
+			echo "$(ROJO)❌ ERROR: No existe archivo .env$(RESET)"; \
+			echo "$(AMARILLO)  cp .env.production.example .env$(RESET)"; \
+			exit 1; \
+		fi; \
+		if grep -q "CAMBIAR_CONTRASEÑA_SEGURA_AQUI" .env 2>/dev/null; then \
+			echo "$(ROJO)❌ ERROR: Debes cambiar DB_PASSWORD/DB_ROOT_PASSWORD en .env$(RESET)"; \
+			exit 1; \
+		fi; \
 	else \
-		echo "$(VERDE)✓ .env ya existe.$(RESET)"; \
+		# 1. Crear .env global si no existe
+		if [ ! -f .env ]; then \
+			echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
+			cp .env.example .env; \
+		else \
+			echo "$(VERDE)✓ .env ya existe.$(RESET)"; \
+		fi; \
 	fi
 	@# 2. Verificar y generar APP_KEY si está vacía
 	@if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
@@ -57,23 +99,31 @@ init: ## 🚀 Inicialización completa (primera vez): .env, build, up, dependenc
 	@echo "$(VERDE)✓ Carpetas compartidas creadas.$(RESET)"
 	@# 5. Construir imágenes
 	@echo "$(AMARILLO)🐳 Construyendo imágenes Docker...$(RESET)"
-	docker compose build
+	$(DC) build
 	@# 6. Levantar servicios
 	@echo "$(AMARILLO)🐳 Levantando servicios...$(RESET)"
-	docker compose up -d
+	$(DC) up -d
 	@# 7. Instalar dependencias de Composer
 	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"
-	docker compose exec laravel-app composer install --no-interaction
-	@# 8. Instalar dependencias de npm y compilar assets
-	@echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"
-	cd Backend && npm install
-	@echo "$(AMARILLO)🔨 Compilando assets con Vite...$(RESET)"
-	cd Backend && npm run build
+	$(DC) exec -T laravel-app composer install --no-interaction
+	@# 8. Instalar dependencias de npm y compilar assets (solo DEV)
+	@if [ "$(DEV)" != "0" ]; then \
+		echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"; \
+		cd Backend && npm install; \
+		echo "$(AMARILLO)🔨 Compilando assets con Vite...$(RESET)"; \
+		cd Backend && npm run build; \
+	fi
 	@# 9. Permisos de storage
 	@$(MAKE) permisos
 	@# 10. Ejecutar migraciones y seeders
 	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"
-	docker compose exec laravel-app php artisan migrate --force --seed
+	$(DC) exec -T laravel-app php artisan migrate --force --seed
+	@if [ "$(DEV)" = "0" ]; then \
+		echo "$(AMARILLO)⚡ Optimizando Laravel (cache config/rutas/vistas)...$(RESET)"; \
+		$(DC) exec -T laravel-app php artisan config:cache; \
+		$(DC) exec -T laravel-app php artisan route:cache; \
+		$(DC) exec -T laravel-app php artisan view:cache; \
+	fi
 	@echo ""
 	@echo "$(VERDE)═══ ✅ Minerva inicializada correctamente ═══$(RESET)"
 	@echo "$(VERDE)  Frontend:  http://localhost:$${FRONTEND_PORT:-4200}$(RESET)"
@@ -124,28 +174,95 @@ generar-env-laravel: ## 🔧 Generar Backend/.env desde el .env global
 
 up: ## ▶️  Levantar todos los servicios
 	@echo "$(AZUL)▶️  Levantando servicios...$(RESET)"
-	docker compose up -d
+	$(DC) up -d
 	@echo "$(VERDE)✓ Servicios levantados.$(RESET)"
 
 down: ## ⏹️  Detener todos los servicios
 	@echo "$(ROJO)⏹️  Deteniendo servicios...$(RESET)"
-	docker compose down
+	$(DC) down
 	@echo "$(VERDE)✓ Servicios detenidos.$(RESET)"
 
 restart: ## 🔄 Reiniciar todos los servicios
 	@echo "$(AMARILLO)🔄 Reiniciando servicios...$(RESET)"
-	docker compose restart
+	$(DC) restart
 	@echo "$(VERDE)✓ Servicios reiniciados.$(RESET)"
 
 build: ## 🔨 Reconstruir imágenes Docker (sin caché)
 	@echo "$(AMARILLO)🔨 Reconstruyendo imágenes...$(RESET)"
-	docker compose build --no-cache
+	$(DC) build --no-cache
 
 logs: ## 📋 Ver logs en tiempo real de todos los servicios
-	docker compose logs -f
+	$(DC) logs -f
 
 status: ## 📊 Ver estado de los contenedores
-	docker compose ps
+	$(DC) ps
+
+# ==============================================================================
+# COMPONENTES (DEV: servicios | PROD: profiles)
+# ==============================================================================
+
+front-up: ## Levantar solo Front (DEV: frontend | PROD: profiles front)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front up -d; \
+	else \
+		$(DC) up -d frontend; \
+	fi
+
+front-down: ## Bajar solo Front (DEV: frontend | PROD: profiles front)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front stop; \
+	else \
+		$(DC) stop frontend; \
+	fi
+
+front-logs: ## Logs solo Front (DEV: frontend | PROD: profiles front)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front logs -f; \
+	else \
+		$(DC) logs -f frontend; \
+	fi
+
+back-up: ## Levantar solo Back (DEV: laravel-* + db | PROD: profiles back)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile back up -d; \
+	else \
+		$(DC) up -d laravel-app laravel-web minerva-db; \
+	fi
+
+back-down: ## Bajar solo Back (DEV: laravel-* + db | PROD: profiles back)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile back stop; \
+	else \
+		$(DC) stop laravel-app laravel-web minerva-db; \
+	fi
+
+back-logs: ## Logs solo Back (DEV: laravel-* + db | PROD: profiles back)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile back logs -f; \
+	else \
+		$(DC) logs -f laravel-app laravel-web minerva-db; \
+	fi
+
+ia-up: ## Levantar solo IA (DEV: minerva-* | PROD: profiles ia)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile ia up -d; \
+	else \
+		$(DC) up -d minerva-asr minerva-diarizador; \
+	fi
+
+ia-down: ## Bajar solo IA (DEV: minerva-* | PROD: profiles ia)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile ia stop; \
+	else \
+		$(DC) stop minerva-asr minerva-diarizador; \
+	fi
+
+ia-logs: ## Logs solo IA (DEV: minerva-* | PROD: profiles ia)
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile ia logs -f; \
+	else \
+		$(DC) logs -f minerva-asr minerva-diarizador; \
+	fi
 
 # ==============================================================================
 # LARAVEL - Migraciones y Base de Datos
@@ -153,20 +270,20 @@ status: ## 📊 Ver estado de los contenedores
 
 migrate: ## 🗄️  Ejecutar migraciones de Laravel
 	@echo "$(AMARILLO)🗄️ Ejecutando migraciones...$(RESET)"
-	docker compose exec laravel-app php artisan migrate --force
+	$(DC) exec -T laravel-app php artisan migrate --force
 
 seed: ## 🌱 Ejecutar seeders de Laravel
 	@echo "$(AMARILLO)🌱 Ejecutando seeders...$(RESET)"
-	docker compose exec laravel-app php artisan db:seed
+	$(DC) exec -T laravel-app php artisan db:seed
 
 migrate-fresh: ## 💥 Recrear toda la base de datos (¡DESTRUCTIVO!)
 	@echo "$(ROJO)💥 Recreando base de datos desde cero...$(RESET)"
-	docker compose exec laravel-app php artisan migrate:fresh --seed
+	$(DC) exec -T laravel-app php artisan migrate:fresh --seed
 
 permisos: ## 🔐 Corregir permisos de storage de Laravel
 	@echo "$(AMARILLO)🔐 Corrigiendo permisos...$(RESET)"
-	docker compose exec laravel-app chown -R www-data:www-data storage bootstrap/cache
-	docker compose exec laravel-app chmod -R 775 storage bootstrap/cache
+	$(DC) exec -T laravel-app chown -R www-data:www-data storage bootstrap/cache
+	$(DC) exec -T laravel-app chmod -R 775 storage bootstrap/cache
 	@echo "$(VERDE)✓ Permisos corregidos.$(RESET)"
 
 build-assets: ## 🎨 Compilar assets frontend con Vite
@@ -179,13 +296,13 @@ build-assets: ## 🎨 Compilar assets frontend con Vite
 # ==============================================================================
 
 shell-backend: ## 🐚 Abrir shell en el contenedor de Laravel
-	docker compose exec laravel-app bash
+	$(DC) exec laravel-app bash
 
 shell-frontend: ## 🐚 Abrir shell en el contenedor de Angular
-	docker compose exec frontend sh
+	$(DC) exec frontend sh
 
 shell-db: ## 🐚 Acceder a la consola de MariaDB
-	docker compose exec minerva-db mariadb -u$${DB_USERNAME:-minerva} -p$${DB_PASSWORD:-minerva_secret} $${DB_DATABASE:-backend_minerva}
+	$(DC) exec minerva-db mariadb -u$${DB_USERNAME:-minerva} -p$${DB_PASSWORD:-minerva_secret} $${DB_DATABASE:-backend_minerva}
 
 # ==============================================================================
 # LIMPIEZA
@@ -193,5 +310,5 @@ shell-db: ## 🐚 Acceder a la consola de MariaDB
 
 clean: ## 🧹 Limpiar todo (contenedores, volúmenes, imágenes del proyecto)
 	@echo "$(ROJO)🧹 Limpiando todo el entorno Minerva...$(RESET)"
-	docker compose down -v --rmi local
+	$(DC) down -v --rmi local
 	@echo "$(VERDE)✓ Limpieza completa.$(RESET)"
