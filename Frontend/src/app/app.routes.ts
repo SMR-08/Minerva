@@ -38,5 +38,10 @@ export const routes: Routes = [
         component: FormularioRegistroComponent
       }
     ]
+  },
+  {
+    path: '**',
+    redirectTo: '/',
+    pathMatch: 'full'
   }
 ];
