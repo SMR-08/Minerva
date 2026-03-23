@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
 
 @Component({
   selector: 'app-formulario-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './formulario-registro.component.html',
   styleUrl: './formulario-registro.component.css'
 })
@@ -22,8 +22,18 @@ export class FormularioRegistroComponent {
   mensaje: string = '';
   error: boolean = false;
   enviado: boolean = false;
+  mostrarContrasena: boolean = false;
+  mostrarContrasenaConfirm: boolean = false;
 
   constructor(private authService: AuthService, private router: Router) {}
+
+  toggleMostrarContrasena(): void {
+    this.mostrarContrasena = !this.mostrarContrasena;
+  }
+
+  toggleMostrarContrasenaConfirm(): void {
+    this.mostrarContrasenaConfirm = !this.mostrarContrasenaConfirm;
+  }
 
   onSubmit(): void {
     this.enviado = true;
