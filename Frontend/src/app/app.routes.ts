@@ -4,9 +4,14 @@ import { FormularioSubidaComponent } from './formulario-subida/formulario-subida
 import { FormularioRegistroComponent } from './formulario-registro/formulario-registro.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { FormularioLoginComponent } from './formulario-login/formulario-login.component';
-import { authGuard } from './auth.guard';
+import { LandingPageComponent } from './landing-page/landing-page.component';
+import { AuthGuard } from './auth.guard';
 
 export const routes: Routes = [
+  {
+    path: '',
+    component: LandingPageComponent
+  },
   {
     path: 'login',
     component: FormularioLoginComponent
@@ -16,12 +21,12 @@ export const routes: Routes = [
     component: FormularioRegistroComponent
   },
   {
-    path: '',
+    path: 'dashboard',
     component: LayoutComponent,
-    canActivate: [authGuard],
+    canActivate: [AuthGuard],
     children: [
       {
-        path: 'dashboard',
+        path: '',
         component: DashboardComponent
       },
       {
@@ -29,10 +34,14 @@ export const routes: Routes = [
         component: FormularioSubidaComponent
       },
       {
-        path: '',
-        redirectTo: 'dashboard',
-        pathMatch: 'full'
+        path: 'cuenta',
+        component: FormularioRegistroComponent
       }
     ]
+  },
+  {
+    path: '**',
+    redirectTo: '/',
+    pathMatch: 'full'
   }
 ];

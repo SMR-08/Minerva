@@ -1,39 +1,42 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
-import { HeaderComponent } from '../layout/header/header.component';
-import { FooterComponent } from '../layout/footer/footer.component';
 
 @Component({
   selector: 'app-formulario-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, HeaderComponent, FooterComponent],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './formulario-login.component.html',
   styleUrls: ['./formulario-login.component.css']
 })
 export class FormularioLoginComponent {
   formulario = {
-    email: '',
+    usuario: '',
     contrasena: ''
   };
 
   mensaje: string = '';
   error: boolean = false;
   enviado: boolean = false;
+  mostrarContrasena: boolean = false;
 
   constructor(private auth: AuthService, private router: Router) {}
 
+  toggleMostrarContrasena(): void {
+    this.mostrarContrasena = !this.mostrarContrasena;
+  }
+
   onSubmit(): void {
     this.enviado = true;
-    if (!this.formulario.email || !this.formulario.contrasena) {
-      this.mensaje = 'Por favor, completa correo y contraseña';
+    if (!this.formulario.usuario || !this.formulario.contrasena) {
+      this.mensaje = 'Por favor, completa usuario y contraseña';
       this.error = true;
       return;
     }
 
-    this.auth.login(this.formulario.email, this.formulario.contrasena).subscribe({
+    this.auth.login(this.formulario.usuario, this.formulario.contrasena).subscribe({
       next: (res) => {
         this.mensaje = 'Ingreso exitoso';
         this.error = false;
@@ -48,7 +51,7 @@ export class FormularioLoginComponent {
   }
 
   onLimpiar(): void {
-    this.formulario = { email: '', contrasena: '' };
+    this.formulario = { usuario: '', contrasena: '' };
     this.mensaje = '';
     this.error = false;
     this.enviado = false;
