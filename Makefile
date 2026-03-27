@@ -22,6 +22,9 @@ endif
 
 DC := docker compose -f $(COMPOSE_FILE)
 
+# Ruta absoluta al directorio del proyecto
+PROJECT_ROOT := $(shell pwd)
+
 .PHONY: help mode init up down restart build logs status \
         front-up front-down front-logs back-up back-down back-logs ia-up ia-down ia-logs \
         migrate seed shell-backend shell-frontend shell-db \
@@ -75,7 +78,6 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 			exit 1; \
 		fi; \
 	else \
-		# 1. Crear .env global si no existe
 		if [ ! -f .env ]; then \
 			echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
 			cp .env.example .env; \
@@ -109,9 +111,7 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 	@# 8. Instalar dependencias de npm y compilar assets (solo DEV)
 	@if [ "$(DEV)" != "0" ]; then \
 		echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"; \
-		cd Backend && npm install; \
-		echo "$(AMARILLO)🔨 Compilando assets con Vite...$(RESET)"; \
-		cd Backend && npm run build; \
+		$(MAKE) build-assets; \
 	fi
 	@# 9. Permisos de storage
 	@$(MAKE) permisos
