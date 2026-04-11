@@ -124,12 +124,19 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 		$(DC) exec -T laravel-app php artisan route:cache; \
 		$(DC) exec -T laravel-app php artisan view:cache; \
 	fi
+	@# 11. Iniciar workers de procesamiento
+	@echo "$(AMARILLO)👷 Iniciando workers de procesamiento...$(RESET)"
+	$(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker
+	@echo "$(VERDE)✓ Workers iniciados.$(RESET)"
 	@echo ""
 	@echo "$(VERDE)═══ ✅ Minerva inicializada correctamente ═══$(RESET)"
 	@echo "$(VERDE)  Frontend:  http://localhost:$${FRONTEND_PORT:-4200}$(RESET)"
 	@echo "$(VERDE)  Backend:   http://localhost:$${LARAVEL_PORT:-8001}$(RESET)"
 	@echo "$(VERDE)  IA (ASR):  http://localhost:$${IA_ASR_PORT:-8002}$(RESET)"
 	@echo "$(VERDE)  Base Datos: localhost:$${DB_EXTERNAL_PORT:-3307}$(RESET)"
+	@echo ""
+	@echo "$(AMARILLO)  Para ver el estado de la cola: make cola-estado$(RESET)"
+	@echo "$(AMARILLO)  Para escalar workers: make scale-workers N=3$(RESET)"
 
 generar-env-laravel: ## 🔧 Generar Backend/.env desde el .env global
 	@echo "$(AMARILLO)🔧 Generando Backend/.env desde variables globales...$(RESET)"
@@ -305,6 +312,30 @@ shell-db: ## 🐚 Acceder a la consola de MariaDB
 	$(DC) exec minerva-db mariadb -u$${DB_USERNAME:-minerva} -p$${DB_PASSWORD:-minerva_secret} $${DB_DATABASE:-backend_minerva}
 
 # ==============================================================================
+# COLAS Y WORKERS
+# ==============================================================================
+
+cola-estado: ## 📊 Ver estado de la cola de procesamiento
+	@echo "$(AZUL)📊 Estado de la cola...$(RESET)"
+	$(DC) exec -T laravel-app php artisan queue:monitor database
+
+cola-limpiar: ## 🧹 Limpiar jobs fallidos de la cola
+	@echo "$(AMARILLO)🧹 Limpiando jobs fallidos...$(RESET)"
+	$(DC) exec -T laravel-app php artisan queue:flush
+
+scale-workers: ## ▶️ Escalar workers de procesamiento (usage: make scale-workers N=3)
+	@echo "$(AZUL)▶️ Escalando workers a $(N)...$(RESET)"
+	$(DC) up -d --scale laravel-worker=$(N) laravel-worker
+
+worker-logs: ## 📋 Ver logs del worker de procesamiento
+	@echo "$(AZUL)📋 Logs del worker...$(RESET)"
+	$(DC) logs -f laravel-worker
+
+sse-logs: ## 📡 Ver logs de eventos SSE
+	@echo "$(AZUL)📡 Logs de SSE...$(RESET)"
+	$(DC) exec -T laravel-app tail -f storage/logs/laravel.log | grep -i "sse\|callback\|transcrip"
+
+# ==============================================================================
 # LIMPIEZA
 # ==============================================================================
 
@@ -312,3 +343,29 @@ clean: ## 🧹 Limpiar todo (contenedores, volúmenes, imágenes del proyecto)
 	@echo "$(ROJO)🧹 Limpiando todo el entorno Minerva...$(RESET)"
 	$(DC) down -v --rmi local
 	@echo "$(VERDE)✓ Limpieza completa.$(RESET)"
+
+# ==============================================================================
+# TESTING
+# ==============================================================================
+
+test: test-backend test-e2e ## Ejecutar todos los tests (backend + E2E)
+
+test-backend: ## Ejecutar tests de Laravel con Pest
+	@echo "$(AZUL)🧪 Ejecutando tests de Laravel...$(RESET)"
+	$(DC) exec -T laravel-app ./vendor/bin/pest tests/Arch.php tests/Feature tests/Unit
+
+test-e2e: ## Ejecutar tests E2E con Playwright (modo dev)
+	@echo "$(AZUL)🎭 Ejecutando tests E2E con Playwright...$(RESET)"
+	cd e2e && npx playwright test --reporter=list
+
+test-e2e-ui: ## Ejecutar tests E2E con Playwright en modo UI
+	@echo "$(AZUL)🎭 Ejecutando tests E2E en modo UI...$(RESET)"
+	cd e2e && npx playwright test --ui
+
+test-e2e-report: ## Generar y mostrar reporte HTML de Playwright
+	@echo "$(AZUL)📊 Generando reporte E2E...$(RESET)"
+	cd e2e && npx playwright test --reporter=html && npx playwright show-report
+
+test-e2e-prod: ## Ejecutar tests E2E contra entorno de producción
+	@echo "$(AZUL)🎭 Ejecutando tests E2E contra producción...$(RESET)"
+	cd e2e && ENV=prod npx playwright test --reporter=list
