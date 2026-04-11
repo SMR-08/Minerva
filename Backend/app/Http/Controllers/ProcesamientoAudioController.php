@@ -7,10 +7,10 @@ use App\Models\Transcripcion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
-use GuzzleHttp\Client;
 
 class ProcesamientoAudioController extends Controller
 {
@@ -38,11 +38,10 @@ class ProcesamientoAudioController extends Controller
 
         // 2. Verificar Servicio IA
         try {
-            $urlIA = env('AI_BACKEND_URL');
+            $urlIA = config('audio.ia.upload_url');
             if (!$urlIA) {
                  $estado['ai_service'] = 'not_configured';
             } else {
-                // Asumimos que el backend de IA tiene un endpoint / o /health o /estado_cola
                 $respuesta = Http::timeout(2)->get("$urlIA/estado_cola");
                 
                 if ($respuesta->successful()) {
@@ -74,7 +73,11 @@ class ProcesamientoAudioController extends Controller
             'idioma' => 'string|in:auto,es,en',
         ]);
 
-        $tema = Tema::findOrFail($id_tema);
+        $tema = Tema::where('id_tema', $id_tema)
+            ->whereHas('asignatura', function ($consulta) {
+                $consulta->where('id_usuario', Auth::user()->id_usuario);
+            })
+            ->firstOrFail();
         $uuid = Str::uuid()->toString();
 
         // 2. Crear registro preliminar de Transcripción
@@ -130,36 +133,35 @@ class ProcesamientoAudioController extends Controller
      */
     private function forwardToIA($file, string $uuid, string $idioma): void
     {
-        $client = new Client([
-            'timeout' => config('audio.ia.timeout', 7200), // 2 horas
-        ]);
-
         $callbackUrl = route('ia.callback', [
             'secret' => config('audio.ia.callback_secret')
         ]);
 
-        // Streaming: el archivo se envía chunk-a-chunk sin cargarse completo en memoria
-        $client->post(config('audio.ia.upload_url') . '/upload', [
-            'multipart' => [
-                [
-                    'name' => 'audio',
-                    'contents' => fopen($file->getRealPath(), 'r'),
-                    'filename' => $uuid . '.' . $file->getClientOriginalExtension()
-                ],
+        $uploadUrl = config('audio.ia.upload_url');
+        $timeout = config('audio.ia.timeout', 7200);
+
+        // Using Laravel's Http facade for testability
+        $response = Http::timeout($timeout)
+            ->attach('audio', fopen($file->getRealPath(), 'r'), $uuid . '.' . $file->getClientOriginalExtension())
+            ->asMultipart()
+            ->post("$uploadUrl/upload", [
                 [
                     'name' => 'uuid',
-                    'contents' => $uuid
+                    'contents' => $uuid,
                 ],
                 [
                     'name' => 'idioma',
-                    'contents' => $idioma
+                    'contents' => $idioma,
                 ],
                 [
                     'name' => 'callback_url',
-                    'contents' => $callbackUrl
+                    'contents' => $callbackUrl,
                 ],
-            ]
-        ]);
+            ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('Error al comunicar con el servicio de IA: ' . $response->body());
+        }
     }
 
     /**

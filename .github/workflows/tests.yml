@@ -1,0 +1,180 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  backend-tests:
+    name: Laravel Tests (Pest)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mariadb:latest
+        env:
+          MYSQL_DATABASE: minerva_test
+          MYSQL_USER: minerva
+          MYSQL_PASSWORD: minerva_secret
+          MYSQL_ROOT_PASSWORD: root_secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, bcmath
+          coverage: none
+
+      - name: Install Backend Dependencies
+        working-directory: ./Backend
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generate APP_KEY
+        working-directory: ./Backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Configure Environment
+        working-directory: ./Backend
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: minerva_test
+          DB_USERNAME: minerva
+          DB_PASSWORD: minerva_secret
+        run: |
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=minerva_test/' .env
+          sed -i 's/DB_USERNAME=.*/DB_USERNAME=minerva/' .env
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=minerva_secret/' .env
+
+      - name: Run Migrations
+        working-directory: ./Backend
+        run: php artisan migrate --force
+
+      - name: Run Pest Tests
+        working-directory: ./Backend
+        run: ./vendor/bin/pest tests/Arch.php tests/Feature tests/Unit --colors=always
+
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mariadb:latest
+        env:
+          MYSQL_DATABASE: minerva_test
+          MYSQL_USER: minerva
+          MYSQL_PASSWORD: minerva_secret
+          MYSQL_ROOT_PASSWORD: root_secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, bcmath
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Backend Dependencies
+        working-directory: ./Backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install Frontend Dependencies
+        working-directory: ./Frontend
+        run: npm install
+
+      - name: Install Playwright Dependencies
+        working-directory: ./e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Configure Backend
+        working-directory: ./Backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=minerva_test/' .env
+          sed -i 's/DB_USERNAME=.*/DB_USERNAME=minerva/' .env
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=minerva_secret/' .env
+          sed -i 's/APP_ENV=.*/APP_ENV=testing/' .env
+          sed -i 's/APP_DEBUG=.*/APP_DEBUG=true/' .env
+
+      - name: Run Migrations
+        working-directory: ./Backend
+        run: php artisan migrate --force
+
+      - name: Start Laravel Server
+        working-directory: ./Backend
+        run: php artisan serve --host=127.0.0.1 --port=8000 &
+
+      - name: Build and Start Frontend
+        working-directory: ./Frontend
+        run: npx ng serve --host 127.0.0.1 --port 4200 --poll 2000 &
+
+      - name: Wait for Services
+        run: |
+          echo "Waiting for backend..."
+          for i in $(seq 1 30); do
+            curl -s http://127.0.0.1:8000 > /dev/null && break
+            sleep 2
+          done
+          echo "Waiting for frontend..."
+          for i in $(seq 1 60); do
+            curl -s http://127.0.0.1:4200 > /dev/null && break
+            sleep 2
+          done
+
+      - name: Run Playwright Tests
+        working-directory: ./e2e
+        run: npx playwright test --reporter=list
+
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-videos
+          path: e2e/test-results/
+          retention-days: 30

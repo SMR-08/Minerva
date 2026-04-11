@@ -1,0 +1,16 @@
+{
+  "name": "minerva-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:dev": "ENV=dev playwright test",
+    "test:prod": "ENV=prod playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@types/node": "^22.0.0"
+  }
+}
