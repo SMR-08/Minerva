@@ -14,21 +14,28 @@ class Transcripcion extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'id_tema', 
-        'uuid_referencia', 
-        'nombre_archivo_original', 
-        'duracion_segundos', 
-        'titulo', 
-        'texto_plano', 
-        'texto_diarizado', 
-        'resumen_ia', 
-        'mapa_mental_mermaid'
+        'id_tema',
+        'uuid_referencia',
+        'estado',
+        'progreso_porcentaje',
+        'etapa_actual',
+        'nombre_archivo_original',
+        'duracion_segundos',
+        'titulo',
+        'texto_plano',
+        'texto_diarizado',
+        'resumen_ia',
+        'mapa_mental_mermaid',
+        'intentos',
+        'error_mensaje'
     ];
 
     protected $casts = [
         'texto_diarizado' => 'array', // Auto-JSON decode
         'fecha_grabacion' => 'datetime',
         'fecha_procesamiento' => 'datetime',
+        'progreso_porcentaje' => 'integer',
+        'intentos' => 'integer',
     ];
 
     public function tema()

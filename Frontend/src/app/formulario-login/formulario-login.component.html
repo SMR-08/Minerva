@@ -5,17 +5,17 @@
 
     <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
       <div class="form-group">
-        <label for="usuario">Usuario:</label>
+        <label for="email">Email:</label>
         <input
           type="text"
-          id="usuario"
-          name="usuario"
-          [(ngModel)]="formulario.usuario"
+          id="email"
+          name="email"
+          [(ngModel)]="formulario.email"
           required
-          placeholder="Ingrese su usuario"
+          placeholder="Ingrese su correo electrónico"
           class="form-control"
         />
-        <small *ngIf="formulario.usuario === '' && enviado" class="error">El usuario es requerido</small>
+        <small *ngIf="formulario.email === '' && enviado" class="error">El email es requerido</small>
       </div>
 
       <div class="form-group">
@@ -48,7 +48,7 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn-registrar" [disabled]="!formulario.usuario || !formulario.contrasena">Ingresar</button>
+        <button type="submit" class="btn-registrar" [disabled]="!formulario.email || !formulario.contrasena">Ingresar</button>
         <button type="button" class="btn-limpiar" (click)="onLimpiar()">Limpiar</button>
       </div>
 

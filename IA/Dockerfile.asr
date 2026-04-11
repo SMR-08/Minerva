@@ -21,6 +21,7 @@ RUN echo "--- Instalando dependencias Python... ---" && \
     fastapi \
     "uvicorn[standard]" \
     requests \
+    aiohttp \
     # Modelo ASR Qwen3:
     qwen-asr \
     # Utilidades de audio:

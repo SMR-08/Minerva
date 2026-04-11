@@ -77,7 +77,7 @@ class AsignaturaController extends Controller
             'color_hex' => 'nullable|string|size:7',
         ]);
 
-        $asignatura->update($peticion->all());
+        $asignatura->update($peticion->only(['nombre', 'profesor', 'descripcion', 'color_hex']));
 
         return response()->json($asignatura);
     }
