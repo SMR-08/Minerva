@@ -7,10 +7,10 @@ use App\Models\Transcripcion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\DB;
+use GuzzleHttp\Client;
 
 class ProcesamientoAudioController extends Controller
 {
@@ -60,91 +60,161 @@ class ProcesamientoAudioController extends Controller
     }
 
     /**
-     * Sube un audio y lo envía a procesar a la IA.
+     * Sube un audio y lo envía a procesar a la IA (Arquitectura "Patata Caliente").
      * POST /api/temas/{id}/procesar-audio
+     *
+     * El archivo se hace streaming directamente a IA sin guardarse en el backend.
      */
     public function procesarAudio(Request $peticion, string $id_tema)
     {
         // 1. Validaciones
+        $maxSize = config('audio.max_size_mb', 2048) * 1024; // MB a KB para Laravel
         $peticion->validate([
-            'audio' => 'required|file|mimes:wav,mp3,m4a|max:512000', // Max 500MB
+            'audio' => 'required|file|mimes:wav,mp3,m4a,flac,ogg|max:' . $maxSize,
             'idioma' => 'string|in:auto,es,en',
         ]);
 
         $tema = Tema::findOrFail($id_tema);
-        
-        // TODO: Verificar propiedad del tema (Security 10/10)
-        // $this->authorize('update', $tema);
+        $uuid = Str::uuid()->toString();
 
-        // 2. Guardar archivo en el FS Compartido
-        $archivo = $peticion->file('audio');
-        $uuid = Str::uuid();
-        $nombreArchivo = $uuid . '.' . $archivo->getClientOriginalExtension();
-        
-        // Guardamos en el disco local configurado en FILESYSTEM_DISK -> root
-        // Pero necesitamos que esté en AI_INPUT_PATH.
-        $rutaDestino = env('AI_INPUT_PATH');
-        
-        if (!is_dir($rutaDestino)) {
-             return response()->json(['error' => 'Configuración de servidor incorrecta (Ruta IA no existe)'], 500);
-        }
-
-        $archivo->move($rutaDestino, $nombreArchivo);
-
-        // 3. Crear registro preliminar de Transcripción
+        // 2. Crear registro preliminar de Transcripción
         $transcripcion = Transcripcion::create([
             'id_tema' => $tema->id_tema,
             'uuid_referencia' => $uuid,
-            'nombre_archivo_original' => $archivo->getClientOriginalName(),
-            'titulo' => 'Procesando: ' . $archivo->getClientOriginalName(),
-            'duracion_segundos' => 0, // Se actualizará al recibir respuesta
-            // 'estado' => 'PROCESANDO' // Si tuviéramos una columna estado
+            'estado' => 'SUBIENDO',
+            'nombre_archivo_original' => $peticion->file('audio')->getClientOriginalName(),
+            'titulo' => 'Subiendo: ' . $peticion->file('audio')->getClientOriginalName(),
+            'duracion_segundos' => 0,
+            'progreso_porcentaje' => 0,
         ]);
 
-        // 4. Llamar a la IA (Sin Bloquear idealmente, pero MVP Bloqueante/Timeout largo)
+        // 3. Streaming forward a IA (proxy streaming - el archivo nunca toca el disco del backend)
         try {
-            $urlIA = env('AI_BACKEND_URL');
-            $timeout = env('AI_TIMEOUT', 300);
+            $this->forwardToIA(
+                $peticion->file('audio'),
+                $uuid,
+                $peticion->idioma ?? 'auto'
+            );
 
-            // Verificar estado cola
-            $respuestaEstado = Http::timeout(5)->get("$urlIA/estado_cola");
-            
-            if ($respuestaEstado->successful() && $respuestaEstado->json('estado') === 'ocupado') {
-                return response()->json([
-                   'message' => 'Archivo subido, pero la IA está ocupada. Inténtalo de nuevo más tarde.',
-                   'transcripcion_id' => $transcripcion->id_transcripcion
-                ], 202); // Accepted
-            }
-
-            // Enviar petición de procesado
-            $respuesta = Http::timeout($timeout)->post("$urlIA/transcribir_diarizado", [
-                'nombre_archivo' => $nombreArchivo,
-                'idioma' => $peticion->idioma ?? 'auto',
-                'activar_asignacion_roles' => true,
+            // 4. Actualizar estado a ENCOLADO
+            $transcripcion->update([
+                'estado' => 'ENCOLADO',
+                'titulo' => 'En cola: ' . $transcripcion->nombre_archivo_original,
             ]);
 
-            if ($respuesta->successful()) {
-                $datos = $respuesta->json();
-                
-                // 5. Actualizar Transcripción con resultados
-                $transcripcion->update([
-                    'titulo' => 'Transcripción: ' . $archivo->getClientOriginalName(),
-                    'texto_plano' => collect($datos['transcripcion'])->pluck('texto')->join("\n"),
-                    'texto_diarizado' => $datos['transcripcion'], // Casted a array JSON
-                    'duracion_segundos' => $datos['metricas_rendimiento']['duracion_audio_segundos'] ?? 0,
-                    'fecha_procesamiento' => now(),
-                ]);
-
-                return response()->json($transcripcion);
-            } else {
-                Log::error("Error IA: " . $respuesta->body());
-                return response()->json(['error' => 'Error al procesar con IA', 'details' => $respuesta->json()], 502);
-            }
+            // 5. Retornar UUID para que frontend se suscriba a SSE
+            return response()->json([
+                'uuid' => $uuid,
+                'estado' => 'ENCOLADO',
+                'message' => 'Archivo subido. Procesando en cola...',
+            ]);
 
         } catch (\Exception $e) {
-            Log::error("Excepción IA: " . $e->getMessage());
-            return response()->json(['error' => 'Error de conexión con servicio IA', 'msg' => $e->getMessage()], 503);
+            Log::error("Error al enviar audio a IA: " . $e->getMessage());
+
+            $transcripcion->update([
+                'estado' => 'FALLIDO',
+                'error_mensaje' => 'Error al enviar a IA: ' . $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Error al procesar',
+                'details' => $e->getMessage(),
+            ], 500);
         }
+    }
+
+    /**
+     * Hace streaming forward del archivo de audio a IA.
+     * El archivo nunca se guarda en el backend.
+     */
+    private function forwardToIA($file, string $uuid, string $idioma): void
+    {
+        $client = new Client([
+            'timeout' => config('audio.ia.timeout', 7200), // 2 horas
+        ]);
+
+        $callbackUrl = route('ia.callback', [
+            'secret' => config('audio.ia.callback_secret')
+        ]);
+
+        // Streaming: el archivo se envía chunk-a-chunk sin cargarse completo en memoria
+        $client->post(config('audio.ia.upload_url') . '/upload', [
+            'multipart' => [
+                [
+                    'name' => 'audio',
+                    'contents' => fopen($file->getRealPath(), 'r'),
+                    'filename' => $uuid . '.' . $file->getClientOriginalExtension()
+                ],
+                [
+                    'name' => 'uuid',
+                    'contents' => $uuid
+                ],
+                [
+                    'name' => 'idioma',
+                    'contents' => $idioma
+                ],
+                [
+                    'name' => 'callback_url',
+                    'contents' => $callbackUrl
+                ],
+            ]
+        ]);
+    }
+
+    /**
+     * Callback desde IA cuando completa el procesamiento.
+     * POST /api/ia/callback
+     */
+    public function procesarCallback(Request $request)
+    {
+        // 1. Validar secret de autenticación
+        $secret = $request->header('Authorization', '');
+        $expectedSecret = 'Bearer ' . config('audio.ia.callback_secret');
+
+        if ($secret !== $expectedSecret) {
+            Log::warning("Intento de callback IA con secret inválido");
+            return response()->json(['error' => 'No autorizado'], 401);
+        }
+
+        // 2. Validar datos
+        $request->validate([
+            'uuid' => 'required|string|exists:transcripciones,uuid_referencia',
+            'estado' => 'required|in:COMPLETADO,FALLIDO',
+            'resultado' => 'required_if:estado,COMPLETADO|array',
+            'error' => 'required_if:estado,FALLIDO|string',
+        ]);
+
+        $uuid = $request->uuid;
+        $transcripcion = Transcripcion::where('uuid_referencia', $uuid)->firstOrFail();
+
+        // 3. Procesar según estado
+        if ($request->estado === 'COMPLETADO') {
+            $resultado = $request->resultado;
+
+            $transcripcion->update([
+                'estado' => 'COMPLETADO',
+                'progreso_porcentaje' => 100,
+                'etapa_actual' => null,
+                'titulo' => 'Transcripción: ' . $transcripcion->nombre_archivo_original,
+                'texto_plano' => collect($resultado['transcripcion'])->pluck('texto')->join("\n"),
+                'texto_diarizado' => $resultado['transcripcion'],
+                'duracion_segundos' => $resultado['metricas_rendimiento']['duracion_audio_segundos'] ?? 0,
+                'fecha_procesamiento' => now(),
+            ]);
+
+            Log::info("Transcripción {$uuid} completada exitosamente");
+
+        } else {
+            $transcripcion->update([
+                'estado' => 'FALLIDO',
+                'error_mensaje' => $request->error,
+            ]);
+
+            Log::error("Transcripción {$uuid} fallida: " . $request->error);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /**
