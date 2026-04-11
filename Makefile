@@ -343,3 +343,29 @@ clean: ## 🧹 Limpiar todo (contenedores, volúmenes, imágenes del proyecto)
 	@echo "$(ROJO)🧹 Limpiando todo el entorno Minerva...$(RESET)"
 	$(DC) down -v --rmi local
 	@echo "$(VERDE)✓ Limpieza completa.$(RESET)"
+
+# ==============================================================================
+# TESTING
+# ==============================================================================
+
+test: test-backend test-e2e ## Ejecutar todos los tests (backend + E2E)
+
+test-backend: ## Ejecutar tests de Laravel con Pest
+	@echo "$(AZUL)🧪 Ejecutando tests de Laravel...$(RESET)"
+	$(DC) exec -T laravel-app ./vendor/bin/pest tests/Arch.php tests/Feature tests/Unit
+
+test-e2e: ## Ejecutar tests E2E con Playwright (modo dev)
+	@echo "$(AZUL)🎭 Ejecutando tests E2E con Playwright...$(RESET)"
+	cd e2e && npx playwright test --reporter=list
+
+test-e2e-ui: ## Ejecutar tests E2E con Playwright en modo UI
+	@echo "$(AZUL)🎭 Ejecutando tests E2E en modo UI...$(RESET)"
+	cd e2e && npx playwright test --ui
+
+test-e2e-report: ## Generar y mostrar reporte HTML de Playwright
+	@echo "$(AZUL)📊 Generando reporte E2E...$(RESET)"
+	cd e2e && npx playwright test --reporter=html && npx playwright show-report
+
+test-e2e-prod: ## Ejecutar tests E2E contra entorno de producción
+	@echo "$(AZUL)🎭 Ejecutando tests E2E contra producción...$(RESET)"
+	cd e2e && ENV=prod npx playwright test --reporter=list
