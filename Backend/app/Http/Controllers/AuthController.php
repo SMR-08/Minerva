@@ -17,6 +17,14 @@ class AuthController extends Controller
             'email' => 'required|email|unique:usuarios,email',
             'password' => 'required|string|min:6',
             'device_name' => 'required|string',
+        ], [
+            'nombre_completo.required' => 'El nombre completo es obligatorio.',
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'El correo electrónico no es válido.',
+            'email.unique' => 'Este correo electrónico ya está registrado.',
+            'password.required' => 'La contraseña es obligatoria.',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
+            'device_name.required' => 'El dispositivo es obligatorio.',
         ]);
 
         $usuario = Usuario::create([
@@ -50,6 +58,10 @@ class AuthController extends Controller
             'email' => 'required|email',
             'password' => 'required',
             'device_name' => 'required',
+        ], [
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'El correo electrónico no es válido.',
+            'password.required' => 'La contraseña es obligatoria.',
         ]);
 
         $usuario = Usuario::where('email', $peticion->email)->first();

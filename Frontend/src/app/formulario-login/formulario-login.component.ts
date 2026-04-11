@@ -13,7 +13,7 @@ import { AuthService } from '../auth.service';
 })
 export class FormularioLoginComponent {
   formulario = {
-    usuario: '',
+    email: '',
     contrasena: ''
   };
 
@@ -30,13 +30,13 @@ export class FormularioLoginComponent {
 
   onSubmit(): void {
     this.enviado = true;
-    if (!this.formulario.usuario || !this.formulario.contrasena) {
-      this.mensaje = 'Por favor, completa usuario y contraseña';
+    if (!this.formulario.email || !this.formulario.contrasena) {
+      this.mensaje = 'Por favor, completa email y contraseña';
       this.error = true;
       return;
     }
 
-    this.auth.login(this.formulario.usuario, this.formulario.contrasena).subscribe({
+    this.auth.login(this.formulario.email, this.formulario.contrasena).subscribe({
       next: (res) => {
         this.mensaje = 'Ingreso exitoso';
         this.error = false;
@@ -44,14 +44,15 @@ export class FormularioLoginComponent {
       },
       error: (err) => {
         console.error('Error login:', err);
-        this.mensaje = err.error?.message || 'Credenciales inválidas o error de conexión';
+        const primerError = err.error?.errors ? Object.values(err.error.errors)[0] : err.error?.message;
+        this.mensaje = primerError || 'Credenciales inválidas o error de conexión';
         this.error = true;
       }
     });
   }
 
   onLimpiar(): void {
-    this.formulario = { usuario: '', contrasena: '' };
+    this.formulario = { email: '', contrasena: '' };
     this.mensaje = '';
     this.error = false;
     this.enviado = false;

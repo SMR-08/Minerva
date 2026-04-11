@@ -14,7 +14,7 @@ import { AuthService } from '../auth.service';
 export class FormularioRegistroComponent {
   formulario = {
     nombre: '',
-    usuario: '',
+    email: '',
     contrasena: '',
     contrasenaConfirmar: ''
   };
@@ -38,7 +38,7 @@ export class FormularioRegistroComponent {
   onSubmit(): void {
     this.enviado = true;
 
-    if (!this.formulario.nombre || !this.formulario.usuario || !this.formulario.contrasena || !this.formulario.contrasenaConfirmar) {
+    if (!this.formulario.nombre || !this.formulario.email || !this.formulario.contrasena || !this.formulario.contrasenaConfirmar) {
       this.mensaje = 'Por favor, completa todos los campos requeridos';
       this.error = true;
       return;
@@ -57,8 +57,9 @@ export class FormularioRegistroComponent {
     }
 
     const datosRegistro = {
+      
       nombre: this.formulario.nombre,
-      usuario: this.formulario.usuario,
+      email: this.formulario.email,
       contrasena: this.formulario.contrasena
     };
 
@@ -71,7 +72,8 @@ export class FormularioRegistroComponent {
       },
       error: (err) => {
         console.error('Error registro:', err);
-        this.mensaje = err.error?.message || 'Error al registrarse. Inténtalo de nuevo.';
+        const primerError = err.error?.errors ? Object.values(err.error.errors)[0] : err.error?.message;
+        this.mensaje = primerError || 'Error al registrarse. Inténtalo de nuevo.';
         this.error = true;
       }
     });
@@ -80,7 +82,7 @@ export class FormularioRegistroComponent {
   onLimpiar(): void {
     this.formulario = {
       nombre: '',
-      usuario: '',
+      email: '',
       contrasena: '',
       contrasenaConfirmar: ''
     };

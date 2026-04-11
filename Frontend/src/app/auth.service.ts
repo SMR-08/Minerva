@@ -17,10 +17,10 @@ export class AuthService {
     return navigator.userAgent || 'Angular-Minerva-Client';
   }
 
-  registerUser(datos: { nombre: string; usuario: string; contrasena: string }): Observable<any> {
+  registerUser(datos: { nombre: string; email: string; contrasena: string }): Observable<any> {
     const payload = {
       nombre_completo: datos.nombre,
-      email: datos.usuario,
+      email: datos.email,
       password: datos.contrasena,
       device_name: this.getDeviceName()
     };

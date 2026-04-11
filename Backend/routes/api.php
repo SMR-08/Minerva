@@ -7,6 +7,7 @@ use App\Http\Controllers\AsignaturaController;
 use App\Http\Controllers\TemaController;
 use App\Http\Controllers\ProcesamientoAudioController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\SseController;
 
 // Public Routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -31,6 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('transcripciones', [ProcesamientoAudioController::class, 'index']);
     Route::post('temas/{id}/procesar-audio', [ProcesamientoAudioController::class, 'procesarAudio']);
     Route::get('transcripciones/{id}', [ProcesamientoAudioController::class, 'show']);
+
+    // SSE - Actualizaciones en tiempo real
+    Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado']);
+
+    // Callbacks de IA (protegido con secret)
+    Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback');
+    Route::post('ia/sse-update', [SseController::class, 'sseUpdate']);
     // Rutas de Administración
     Route::middleware('es_admin')->prefix('admin')->group(function () {
         Route::apiResource('usuarios', \App\Http\Controllers\Admin\UsuarioController::class);

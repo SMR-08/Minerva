@@ -43,8 +43,6 @@ services:
     volumes:
       - ./Backend:/var/www
       - backend_vendor:/var/www/vendor
-      - ${SHARED_DIR_ENTRADA:-./Shared/entrada}:${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - ${SHARED_DIR_SALIDA:-./Shared/salida}:${RUTA_CONTENEDOR_SALIDA:-/app/compartido/salida}
     environment:
       - APP_NAME=${APP_NAME:-MinervaBackend}
       - APP_ENV=${APP_ENV:-local}
@@ -72,12 +70,57 @@ services:
       - CACHE_STORE=${CACHE_STORE:-database}
       - AI_BACKEND_URL=${AI_BACKEND_URL:-http://minerva-asr:8000}
       - AI_SERVICE_URL=${AI_SERVICE_URL:-http://minerva-asr:8000}
-      - AI_INPUT_PATH=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - AI_TIMEOUT=${AI_TIMEOUT:-300}
+      - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
+      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
+      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
+      - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
+      - AI_TIMEOUT=${AI_TIMEOUT:-7200}
     networks:
       - minerva-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  # ============================================================================
+  # LARAVEL WORKER - Procesa cola de audio
+  # ============================================================================
+  laravel-worker:
+    build:
+      context: ./Backend
+      args:
+        user: ${WWWUSER:-minerva}
+        uid: ${WWWUSER_ID:-1000}
+    image: minerva-backend-app
+    container_name: minerva-worker
+    working_dir: /var/www
+    volumes:
+      - ./Backend:/var/www
+      - backend_vendor:/var/www/vendor
+    environment:
+      - APP_NAME=${APP_NAME:-MinervaBackend}
+      - APP_ENV=${APP_ENV:-local}
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=${DB_CONNECTION:-mysql}
+      - DB_HOST=minerva-db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-backend_minerva}
+      - DB_USERNAME=${DB_USERNAME:-minerva}
+      - DB_PASSWORD=${DB_PASSWORD:-minerva_secret}
+      - QUEUE_CONNECTION=database
+      - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
+      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
+      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
+      - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
+    command: php artisan queue:work --queue=process_audio --timeout=7200 --sleep=5 --max-jobs=100
+    depends_on:
+      - minerva-db
+      - laravel-app
+    networks:
+      - minerva-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # ============================================================================
   # BACKEND LARAVEL - Servidor Web Nginx
@@ -130,8 +173,10 @@ services:
     volumes:
       - ./IA/main.py:/app/main.py
       - ./IA/ASR:/app/ASR
-      - ${SHARED_DIR_ENTRADA:-./Shared/entrada}:${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - ${SHARED_DIR_SALIDA:-./Shared/salida}:${RUTA_CONTENEDOR_SALIDA:-/app/compartido/salida}
+      - ./IA/worker.py:/app/worker.py
+      - ./IA/procesamiento.py:/app/procesamiento.py
+      # Temporal para archivos en procesamiento (se borra después)
+      - ia_temporal:/tmp
       - ia_cache_hf:/root/.cache/huggingface
       - ia_cache_torch:/root/.cache/torch
     environment:
@@ -139,10 +184,9 @@ services:
       - MODELO_ALIGNER=${MODELO_ALIGNER:-Qwen/Qwen3-ForcedAligner-0.6B}
       - DISPOSITIVO_ASR=${DISPOSITIVO_ASR:-cuda:0}
       - URL_DIARIZADOR=${URL_DIARIZADOR:-http://minerva-diarizador:8000}
-      - RUTA_ENTRADA=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - RUTA_SALIDA_TRANSCRIPCIONES=${RUTA_CONTENEDOR_SALIDA:-/app/compartido/salida}
-      - NOMBRE_ARCHIVO_TRANSCRIPCION=${NOMBRE_ARCHIVO_TRANSCRIPCION:-transcripcion.txt}
-      - NOMBRE_ARCHIVO_CONVERSACION=${NOMBRE_ARCHIVO_CONVERSACION:-conversacion.json}
+      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
+      - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
+      - RUTA_TEMPORAL=/tmp
     deploy:
       resources:
         reservations:
@@ -156,6 +200,44 @@ services:
       - minerva-network
 
   # ============================================================================
+  # IA WORKER - Procesa archivos de la cola
+  # ============================================================================
+  minerva-worker:
+    build:
+      context: ./IA
+      dockerfile: Dockerfile.asr
+    container_name: minerva-ia-worker
+    shm_size: 4gb
+    volumes:
+      - ./IA/main.py:/app/main.py
+      - ./IA/ASR:/app/ASR
+      - ./IA/worker.py:/app/worker.py
+      - ./IA/procesamiento.py:/app/procesamiento.py
+      - ia_temporal:/tmp
+      - ia_cache_hf:/root/.cache/huggingface
+      - ia_cache_torch:/root/.cache/torch
+    environment:
+      - MODELO_ASR=${MODELO_ASR:-Qwen/Qwen3-ASR-1.7B}
+      - DISPOSITIVO_ASR=${DISPOSITIVO_ASR:-cuda:0}
+      - URL_DIARIZADOR=${URL_DIARIZADOR:-http://minerva-diarizador:8000}
+      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
+      - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
+      - RUTA_TEMPORAL=/tmp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['${ID_GPU:-0}']
+              capabilities: [gpu]
+    command: ["python", "worker.py"]
+    restart: unless-stopped
+    networks:
+      - minerva-network
+    depends_on:
+      - minerva-asr
+
+  # ============================================================================
   # IA - Servicio Diarizador (Senko)
   # ============================================================================
   minerva-diarizador:
@@ -166,15 +248,14 @@ services:
     shm_size: 2gb
     volumes:
       - ./IA/DIARIZADOR/main.py:/app/main.py
-      - ${SHARED_DIR_ENTRADA:-./Shared/entrada}:${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - ${SHARED_DIR_SALIDA:-./Shared/salida}:${RUTA_CONTENEDOR_SALIDA:-/app/compartido/salida}
+      - ia_temporal:/tmp
       - ia_cache_hf:/root/.cache/huggingface
       - ia_cache_torch:/root/.cache/torch
     environment:
       - SENKO_DEVICE=${SENKO_DEVICE:-cuda}
       - SENKO_VAD=${SENKO_VAD:-pyannote}
       - SENKO_CLUSTERING=${SENKO_CLUSTERING:-auto}
-      - RUTA_ENTRADA=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
+      - RUTA_TEMPORAL=/tmp
     deploy:
       resources:
         reservations:
@@ -208,3 +289,7 @@ volumes:
     name: minerva_ia_cache_hf
   ia_cache_torch:
     name: minerva_ia_cache_torch
+  ia_temporal:
+    name: minerva_ia_temporal
+    # NOTA: Este volumen es EFÍMERO - se borra automáticamente
+    # Los archivos de audio se eliminan después de procesar

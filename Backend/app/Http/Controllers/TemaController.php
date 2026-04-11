@@ -90,7 +90,7 @@ class TemaController extends Controller
             'orden' => 'integer',
         ]);
 
-        $tema->update($peticion->all());
+        $tema->update($peticion->only(['nombre', 'orden']));
 
         return response()->json($tema);
     }

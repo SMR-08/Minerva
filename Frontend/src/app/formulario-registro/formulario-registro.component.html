@@ -21,17 +21,17 @@
 
       <!-- Campo Usuario -->
       <div class="form-group">
-        <label for="usuario">Usuario:</label>
+        <label for="email">Email:</label>
         <input 
           type="text" 
-          id="usuario" 
-          name="usuario"
-          [(ngModel)]="formulario.usuario"
+          id="email" 
+          name="email"
+          [(ngModel)]="formulario.email"
           required
-          placeholder="Elige un nombre de usuario"
+          placeholder="Ingrese su correo electrónico"
           class="form-control"
         >
-        <small *ngIf="formulario.usuario === '' && enviado" class="error">El usuario es requerido</small>
+        <small *ngIf="formulario.email === '' && enviado" class="error">El email es requerido</small>
       </div>
 
       <!-- Campo Contraseña -->
@@ -100,7 +100,7 @@
       <div class="form-actions">
         <button 
           type="submit" 
-          [disabled]="!formulario.nombre || !formulario.usuario || !formulario.contrasena || !formulario.contrasenaConfirmar"
+          [disabled]="!formulario.nombre || !formulario.email || !formulario.contrasena || !formulario.contrasenaConfirmar"
           class="btn-registrar"
         >
           Registrarse
