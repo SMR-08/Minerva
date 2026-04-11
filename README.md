@@ -12,6 +12,7 @@
 - [Configuración (.env)](#-configuración-env)
 - [Carpeta Compartida (Shared)](#-carpeta-compartida-shared)
 - [Comandos Disponibles (Make)](#-comandos-disponibles-make)
+- [Testing](#-testing)
 - [Producción y despliegue distribuido](#-producción-y-despliegue-distribuido)
 - [Servicios y Puertos](#-servicios-y-puertos)
 - [API del Backend Laravel](#-api-del-backend-laravel)
@@ -235,6 +236,14 @@ make scale-workers N=3 # ▶️  Escalar workers (ej: N=3)
 make worker-logs      # 📋 Ver logs del worker de procesamiento
 make sse-logs         # 📡 Ver logs de eventos SSE
 
+# --- Testing ---
+make test             # 🧪 Ejecutar todos los tests (backend + E2E)
+make test-backend     # 🧪 Tests de Laravel con Pest
+make test-e2e         # 🎭 Tests E2E con Playwright (dev)
+make test-e2e-ui      # 🎭 Playwright en modo UI interactivo
+make test-e2e-report  # 📊 Generar y mostrar reporte HTML
+make test-e2e-prod    # 🎭 Tests E2E contra producción
+
 # --- Acceso a contenedores ---
 make shell-backend    # 🐚 Shell en Laravel
 make shell-frontend   # 🐚 Shell en Angular
@@ -244,6 +253,90 @@ make shell-db         # 🐚 Consola MariaDB
 make permisos         # 🔐 Corregir permisos de storage
 make clean            # 🧹 Limpiar todo (contenedores, volúmenes, imágenes)
 ```
+
+---
+
+## 🧪 Testing
+
+Minerva cuenta con una suite de tests automatizada en **3 niveles** que cubre el flujo completo de usuario, la API REST y la arquitectura del código.
+
+### Resumen de Tests
+
+| Nivel | Herramienta | Tests | Assertions |
+|-------|-------------|-------|------------|
+| **Feature (API)** | Pest PHP | 53 | 131 |
+| **Arquitectura** | Pest Arch | 8 | 19 |
+| **Unit** | PHPUnit | 2 | 2 |
+| **E2E (Navegador)** | Playwright | 18 | - |
+| **TOTAL** | | **81** | **152** |
+
+### Tests de Backend (Pest PHP)
+
+Tests de integración contra la API REST de Laravel. Se ejecutan con SQLite en memoria para máxima velocidad.
+
+```bash
+# Ejecutar todos los tests de backend
+make test-backend
+
+# O directamente
+cd Backend && ./vendor/bin/pest
+```
+
+**Cobertura por módulo:**
+
+| Archivo | Qué prueba | Tests |
+|---------|-----------|-------|
+| `AuthTest.php` | Registro, login, logout, tokens Sanctum | 15 |
+| `AsignaturaTest.php` | CRUD completo, aislamiento por usuario | 13 |
+| `TemaTest.php` | CRUD, vinculación con asignatura, orden | 14 |
+| `ProcesamientoAudioTest.php` | Subida de audio, validaciones, estados | 6 |
+| `TranscripcionTest.php` | Listado, detalle, aislamiento | 5 |
+| `Arch.php` | Estructura del código, buenas prácticas Laravel | 8 |
+
+### Tests E2E (Playwright)
+
+Tests de extremo a extremo que automatizan el navegador y verifican el flujo completo de usuario.
+
+```bash
+# Ejecutar tests E2E (contra frontend de desarrollo)
+make test-e2e
+
+# Modo UI interactivo (depuración visual)
+make test-e2e-ui
+
+# Generar reporte HTML con screenshots y vídeos
+make test-e2e-report
+
+# Ejecutar contra entorno de producción
+make test-e2e-prod
+```
+
+**Flujos cubiertos:**
+
+| Test | Qué verifica |
+|------|-------------|
+| `registro.spec.ts` | Registro exitoso, email duplicado, contraseñas no coinciden, campos vacíos, contraseña corta |
+| `login.spec.ts` | Login correcto, credenciales incorrectas, botón disabled |
+| `dashboard.spec.ts` | Carga correcta, secciones visibles, auth guard |
+| `asignaturas.spec.ts` | Crear, ver temas, eliminar |
+| `temas.spec.ts` | Crear, eliminar |
+| `navegacion-completa.spec.ts` | Flujo E2E completo: registro → login → crear asignatura → crear tema → navegar → logout |
+
+**Cambio de entorno:** Los tests E2E se configuran desde `e2e/playwright.config.ts`. Por defecto apuntan al servidor de desarrollo (`localhost:4200`). Para producción:
+
+```bash
+ENV=prod npx playwright test
+```
+
+### CI/CD (GitHub Actions)
+
+Cada push o pull request ejecuta automáticamente:
+
+1. Tests de backend (Pest) con base de datos MariaDB real
+2. Tests E2E (Playwright) con frontend y backend levantados
+3. Generación de reporte HTML y vídeos de fallos como artifacts
+
+El workflow se encuentra en `.github/workflows/tests.yml`.
 
 ---
 
@@ -386,10 +479,11 @@ Minerva/
 ├── .env.example            # Plantilla de configuración
 ├── .gitignore              # Exclusiones de Git
 ├── docker-compose.yml      # Orquestación de todos los servicios
+├── docker-compose.production.yml  # Configuración de producción
 ├── Makefile                # Comandos de automatización
 ├── README.md               # Este archivo
 │
-├── Shared/                 # 📂 Carpeta compartida IA ↔ Laravel
+├── Shared/                 # 📂 Carpeta compartida IA ↔ Laravel (legacy)
 │   ├── entrada/            #    Audios subidos por usuarios
 │   └── salida/             #    Transcripciones generadas por IA
 │
@@ -402,9 +496,19 @@ Minerva/
 │   ├── app/
 │   ├── database/
 │   ├── routes/
+│   ├── tests/              # 🧪 Tests de Pest (Feature + Arch)
 │   ├── docker/             #    Config Nginx + PHP
 │   ├── Dockerfile
 │   └── composer.json
+│
+├── e2e/                    # 🎭 Tests E2E con Playwright
+│   ├── pages/              #    Page Object Model
+│   ├── tests/              #    Specs de tests
+│   └── playwright.config.ts
+│
+├── .github/
+│   └── workflows/          # 🔄 CI/CD con GitHub Actions
+│       └── tests.yml
 │
 └── IA/                     # 🤖 FastAPI + GPU
     ├── main.py             #    API principal ASR

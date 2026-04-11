@@ -52,7 +52,7 @@ class AudioProcessingJob implements ShouldQueue
             ]);
 
             // Obtener configuración de IA
-            $urlIA = config('audio.ia.upload_url', env('IA_UPLOAD_URL'));
+            $urlIA = config('audio.ia.upload_url');
             $callbackUrl = route('ia.callback', ['secret' => config('audio.ia.callback_secret')]);
 
             // Enviar a IA para procesamiento
