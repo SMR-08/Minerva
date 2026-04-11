@@ -140,7 +140,7 @@ jobs:
 
       - name: Start Laravel Server
         working-directory: ./Backend
-        run: php artisan serve --host=127.0.0.1 --port=8000 &
+        run: php artisan serve --host=127.0.0.1 --port=8001 &
 
       - name: Build and Start Frontend
         working-directory: ./Frontend
@@ -150,7 +150,7 @@ jobs:
         run: |
           echo "Waiting for backend..."
           for i in $(seq 1 30); do
-            curl -s http://127.0.0.1:8000 > /dev/null && break
+            curl -s http://127.0.0.1:8001 > /dev/null && break
             sleep 2
           done
           echo "Waiting for frontend..."
