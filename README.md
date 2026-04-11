@@ -23,27 +23,44 @@
 
 ## 🏗️ Arquitectura
 
+### Flujo "Patata Caliente" (Audio Efímero)
+
+Minerva usa una arquitectura donde el archivo de audio **nunca se almacena permanentemente**:
+
 ```
-┌──────────────┐     HTTP      ┌────────────────────┐     HTTP     ┌──────────────────┐
-│   Frontend   │ ────────────▶ │  Backend (Laravel)  │ ──────────▶ │  Backend IA      │
-│  Angular 17  │               │  PHP-FPM + Nginx    │             │  ASR + Diarizador│
-│  :4200       │               │  :8001              │             │  :8002           │
-└──────────────┘               └─────────┬──────────┘             └────────┬─────────┘
-                                         │                                 │
-                                         ▼                                 ▼
-                                ┌─────────────────┐             ┌──────────────────┐
-                                │    MariaDB       │             │  GPU (NVIDIA)    │
-                                │    :3307         │             │  CUDA            │
-                                └─────────────────┘             └──────────────────┘
-                                                    
-                                         ┌──────────────────────┐
-                                         │   Shared/            │
-                                         │   ├── entrada/       │ ◀── Audios upload
-                                         │   └── salida/        │ ──▶ Transcripciones
-                                         └──────────────────────┘
+┌──────────────┐  multipart  ┌────────────────────┐  streaming  ┌──────────────────┐
+│   Frontend   │ ───────────▶ │  Backend (Laravel) │ ──────────▶ │  Backend IA      │
+│  Angular 17  │             │  PHP-FPM + Nginx   │             │  ASR + Diarizador│
+│  :4200       │             │  :8001             │             │  :8002           │
+└──────────────┘             └─────────┬──────────┘             └────────┬─────────┘
+                                       │                                 │
+                                       ▼                                 ▼
+                              ┌─────────────────┐              ┌──────────────────┐
+                              │    MariaDB       │              │  GPU (NVIDIA)    │
+                              │    :3307         │              │  CUDA            │
+                              └─────────────────┘              │  /tmp/{uuid}.wav │───🗑️
+                                       ▲                       └──────────────────┘
+                                       │                                 │
+                                       └─────────── JSON ────────────────┘
+                                   (solo texto, ~50KB)
 ```
 
-Todos los servicios corren en la red Docker `minerva-network`. Laravel e IA comparten la carpeta `Shared/` para intercambio de archivos de audio y transcripciones.
+**Características clave:**
+- ✅ **Proxy streaming**: Laravel recibe y reenvía el audio a IA sin guardarlo
+- ✅ **Archivo efímero**: Solo existe en `/tmp` de IA durante el procesamiento
+- ✅ **Limpieza automática**: El archivo se elimina después de procesar
+- ✅ **SSE**: Actualizaciones en tiempo real vía Server-Sent Events
+- ✅ **Colas**: Múltiples peticiones se encolan y procesan secuencialmente
+
+### Estados del Procesamiento
+
+| Estado | Descripción | UI Usuario |
+|--------|-------------|------------|
+| `SUBIENDO` | Upload en progreso | Barra de subida |
+| `ENCOLADO` | Esperando turno | "Posición #X en cola" |
+| `PROCESANDO` | IA trabajando | Barra de progreso con etapa |
+| `COMPLETADO` | Terminado | Botón "Ver resultado" |
+| `FALLIDO` | Error | Mensaje claro + reintentar |
 
 ---
 
@@ -60,6 +77,16 @@ Todos los servicios corren en la red Docker `minerva-network`. Laravel e IA comp
 
 > [!WARNING]
 > Los modelos de IA (Qwen3-ASR + Senko) requieren GPU NVIDIA con soporte CUDA. Sin GPU, solo podrás usar el Frontend y Backend Laravel.
+
+### Límites de Archivos
+
+| Concepto | Valor |
+|----------|-------|
+| **Tamaño máximo** | 2 GB |
+| **Formatos** | WAV, MP3, M4A, FLAC, OGG |
+| **Timeout upload** | 2 horas |
+| **Timeout procesamiento** | 2 horas |
+| **Duración máxima** | ~3 horas de audio |
 
 ### Software Requerido
 
@@ -104,13 +131,14 @@ make init
 
 El comando `make init` realiza automáticamente:
 1. ✅ Copia `.env.example` → `.env`
-2. ✅ Crea las carpetas compartidas (`Shared/`)
+2. ✅ Crea las carpetas compartidas (`Shared/`) (legacy)
 3. ✅ Construye las imágenes Docker
-4. ✅ Levanta todos los servicios
+4. ✅ Levanta todos los servicios (incluyendo workers)
 5. ✅ Instala dependencias PHP (Composer)
 6. ✅ Genera la `APP_KEY` de Laravel
 7. ✅ Corrige permisos de `storage/`
 8. ✅ Ejecuta migraciones y seeders de la base de datos
+9. ✅ Inicia los workers de procesamiento de cola
 
 ---
 
@@ -124,33 +152,60 @@ El archivo `.env` en la raíz controla **toda** la configuración. Está dividid
 | **Laravel** | `LARAVEL_PORT`, `DB_*`, `APP_KEY` | Puerto API, credenciales BD |
 | **IA** | `MODELO_ASR`, `DISPOSITIVO_ASR`, `ID_GPU` | Modelo, dispositivo CUDA, GPU |
 | **Comunicación** | `AI_BACKEND_URL`, `URL_DIARIZADOR` | URLs internas Docker |
-| **Shared** | `SHARED_DIR_ENTRADA`, `SHARED_DIR_SALIDA` | Rutas de intercambio de archivos |
+| **Patata Caliente** | `IA_UPLOAD_URL`, `IA_CALLBACK_SECRET`, `LARAVEL_URL` | Upload streaming y callbacks |
+| **Límites** | `AUDIO_MAX_SIZE_MB`, `UPLOAD_TIMEOUT_HOURS` | Tamaño máximo (2048MB), timeout (2h) |
+| **Workers** | `WORKER_REPLICAS` | Número de workers de procesamiento |
+
+### Variables nuevas para "Patata Caliente"
+
+```bash
+# Upload streaming a IA
+IA_UPLOAD_URL=http://minerva-asr:8000
+
+# Secret para autenticar callbacks (¡cambiar en producción!)
+IA_CALLBACK_SECRET=tu_secreto_super_seguro
+
+# URL de Laravel vista desde IA
+LARAVEL_URL=http://laravel-app:80
+
+# Límites de upload
+AUDIO_MAX_SIZE_MB=2048
+UPLOAD_TIMEOUT_HOURS=2
+
+# Workers de procesamiento
+WORKER_REPLICAS=2
+```
 
 Consulta `.env.example` para ver todas las opciones con documentación inline.
 
 ---
 
-## 📂 Carpeta Compartida (Shared)
+## 📂 Carpeta Compartida (Shared) - Legacy
 
-La carpeta `Shared/` es el punto de negociación entre Laravel e IA:
+> [!NOTE]
+> En la arquitectura actual "Patata Caliente", **ya no se usa la carpeta Shared/** para archivos de audio.
+> Se mantiene solo para compatibilidad con versiones anteriores.
 
+**Flujo anterior (legacy):**
 ```
 Shared/
-├── entrada/    ← Laravel deposita los audios aquí
-└── salida/     ← La IA escribe las transcripciones aquí
+├── entrada/    ← Laravel depositaba los audios aquí
+└── salida/     ← La IA escribía las transcripciones aquí
 ```
 
-**Flujo de trabajo:**
+**Flujo actual (Patata Caliente):**
 1. El usuario sube un audio a través del Frontend.
-2. Laravel lo guarda en `Shared/entrada/<uuid>/`.
-3. Laravel envía una petición HTTP al servicio ASR con la ruta del archivo.
-4. El ASR procesa el audio y escribe el resultado en `Shared/salida/<uuid>/`.
-5. Laravel lee la transcripción de `Shared/salida/` y la persiste en la base de datos.
+2. Laravel hace **proxy streaming** del audio directamente a IA.
+3. IA guarda temporalmente en `/tmp/{uuid}.wav`.
+4. IA procesa y elimina el archivo inmediatamente.
+5. IA envía el resultado (JSON ~50KB) a Laravel vía callback HTTP.
+6. Laravel persiste la transcripción en la base de datos.
 
-**Configuración:**
-- Las rutas del host se definen en `.env` con `SHARED_DIR_ENTRADA` y `SHARED_DIR_SALIDA`.
-- Las rutas del contenedor se definen con `RUTA_CONTENEDOR_ENTRADA` y `RUTA_CONTENEDOR_SALIDA`.
-- Ambos backends ven exactamente las mismas rutas internas, lo que garantiza coherencia.
+**Ventajas del nuevo flujo:**
+- ✅ Sin almacenamiento innecesario de archivos grandes (2GB+)
+- ✅ Backend ligero (no necesita espacio para audios)
+- ✅ Limpieza automática después de procesar
+- ✅ Funciona con IA en servidor separado (solo HTTP)
 
 ---
 
@@ -172,6 +227,13 @@ make status           # 📊 Estado de contenedores
 make migrate          # 🗄️  Ejecutar migraciones
 make seed             # 🌱 Ejecutar seeders
 make migrate-fresh    # 💥 Recrear BD completa (¡DESTRUCTIVO!)
+
+# --- Colas y Workers ---
+make cola-estado      # 📊 Ver estado de la cola de procesamiento
+make cola-limpiar     # 🧹 Limpiar jobs fallidos de la cola
+make scale-workers N=3 # ▶️  Escalar workers (ej: N=3)
+make worker-logs      # 📋 Ver logs del worker de procesamiento
+make sse-logs         # 📡 Ver logs de eventos SSE
 
 # --- Acceso a contenedores ---
 make shell-backend    # 🐚 Shell en Laravel
