@@ -1,0 +1,155 @@
+<div class="dashboard-page">
+  <div class="dashboard-bg-pattern"></div>
+
+  <!-- Header -->
+  <header class="dash-header">
+    <div class="header-inner">
+      <div class="logo">
+        <a routerLink="/dashboard" class="logo-link">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
+          <span class="logo-text">MINERVA</span>
+        </a>
+      </div>
+      <div class="header-actions">
+        <div class="user-avatar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <div class="user-menu" *ngIf="userMenuOpen">
+            <a (click)="cerrarSesion()" class="menu-item">Cerrar sesión</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="dash-main">
+    @if (asignatura()) {
+      <!-- Breadcrumbs -->
+      <nav class="breadcrumbs">
+        <a routerLink="/dashboard" class="breadcrumb-link">Inicio</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{{ asignatura()?.nombre }}</span>
+      </nav>
+
+      <!-- Title -->
+      <div class="asignatura-header">
+        <a routerLink="/dashboard" class="btn-back-inline">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </a>
+        <div>
+          <h1 class="asignatura-title">{{ asignatura()?.nombre }}</h1>
+          <p class="asignatura-subtitle">{{ temas().length }} temas · {{ totalTranscripciones() }} transcripciones</p>
+        </div>
+      </div>
+
+      <!-- Temas con transcripciones -->
+      @for (tema of temas(); track tema.id_tema) {
+        <section class="tema-section">
+          <div class="tema-header">
+            <div class="tema-title-row">
+              <div class="folder-icon tema-folder" style="color: #D4A843;">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <h3 class="tema-name">{{ tema.nombre }}</h3>
+            </div>
+            <div class="tema-actions">
+              <button class="btn-subir-compact" (click)="subirAudioParaTema(tema)">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Subir audio
+              </button>
+              <button class="btn-menu" (click)="openTemaMenu(tema.id_tema, $event)" title="Opciones">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.5"/>
+                  <circle cx="12" cy="12" r="1.5"/>
+                  <circle cx="12" cy="19" r="1.5"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="transcripciones-grid">
+            @for (trans of transcripcionesPorTema(tema.id_tema); track trans.id_transcripcion) {
+              <div class="transcripcion-card" (click)="verDetalleTranscripcion(trans)">
+                <div class="trans-card-top">
+                  <div class="trans-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <circle cx="12" cy="13" r="2"/>
+                      <path d="M10 17h4"/>
+                    </svg>
+                  </div>
+                  <span class="trans-arrow">›</span>
+                </div>
+                <h4 class="trans-title">{{ trans.titulo }}</h4>
+                <div class="trans-meta">
+                  <span class="trans-date">{{ trans.fecha_procesamiento | date:'dd-MM-yy' }}</span>
+                  <span class="trans-duration">{{ formatearDuracion(trans.duracion_segundos) }}</span>
+                </div>
+              </div>
+            } @empty {
+              <div class="no-data tema-empty">
+                <p>Aún no hay transcripciones en este tema.</p>
+              </div>
+            }
+          </div>
+        </section>
+      } @empty {
+        <div class="no-data">
+          <p>No hay temas creados en esta asignatura.</p>
+        </div>
+      }
+
+      <!-- Create New Tema -->
+      <div class="subject-card subject-card-new tema-new-card" (click)="crearNuevoTema()">
+        <div class="new-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </div>
+        <span class="new-text">Crear Nuevo Tema</span>
+      </div>
+    }
+  </main>
+
+  <!-- Footer -->
+  <footer class="dash-footer">
+    <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
+      <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+        <div class="logo">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img-sm" />
+          <span class="logo-text">MINERVA</span>
+        </div>
+        <p class="footer-tagline">Sabiduría para el estudiante moderno.</p>
+      </div>
+      <div style="display: flex; gap: 128px;">
+        <div class="footer-column">
+          <h4>Producto</h4>
+          <a href="#">Características</a>
+          <a href="#">Precio</a>
+        </div>
+        <div class="footer-column">
+          <h4>Legal</h4>
+          <a href="#">Acerca de</a>
+          <a href="#">Contacto</a>
+        </div>
+        <div class="footer-column">
+          <h4>Empresa</h4>
+          <a href="#">Privacidad</a>
+          <a href="#">Términos</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>

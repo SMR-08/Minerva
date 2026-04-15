@@ -1,105 +1,203 @@
-<div class="formulario-contenedor">
-  <h2>Subir Archivo de Audio</h2>
-  
-  <form (ngSubmit)="onSubmit()" #audioForm="ngForm">
-    <!-- Campo Nombre -->
-    <div class="form-group">
-      <label for="nombre">Nombre:</label>
-      <input 
-        type="text" 
-        id="nombre" 
-        name="nombre"
-        [(ngModel)]="formulario.nombre"
-        required
-        placeholder="Ingrese el nombre del audio"
-        class="form-control"
-      >
-      <small *ngIf="formulario.nombre === ''" class="error">El nombre es requerido</small>
-    </div>
+<div class="upload-page">
+  <div class="dashboard-bg-pattern"></div>
 
-    <!-- Selector Asignatura -->
-    <div class="form-group">
-      <label for="asignatura">Asignatura:</label>
-      <select 
-        id="asignatura" 
-        name="asignatura"
-        [(ngModel)]="formulario.id_asignatura"
-        (change)="onAsignaturaChange()"
-        class="form-control"
-        required
-      >
-        <option [ngValue]="null">-- Seleccione una asignatura --</option>
-        <option *ngFor="let asig of asignaturas" [ngValue]="asig.id_asignatura">
-          {{ asig.nombre }}
-        </option>
-      </select>
+  <!-- Header -->
+  <header class="dash-header">
+    <div class="header-inner">
+      <div class="logo">
+        <a routerLink="/dashboard" class="logo-link">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
+          <span class="logo-text">MINERVA</span>
+        </a>
+      </div>
+      <div class="header-actions">
+        <div class="user-avatar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <div class="user-menu" *ngIf="userMenuOpen">
+            <a (click)="cerrarSesion()" class="menu-item">Cerrar sesión</a>
+          </div>
+        </div>
+      </div>
     </div>
+  </header>
 
-    <!-- Selector Tema -->
-    <div class="form-group">
-      <label for="tema">Tema:</label>
-      <select 
-        id="tema" 
-        name="tema"
-        [(ngModel)]="formulario.id_tema"
-        class="form-control"
-        [disabled]="!formulario.id_asignatura"
-        required
-      >
-        <option [ngValue]="null">-- Seleccione un tema --</option>
-        <option *ngFor="let tema of temasFiltrados" [ngValue]="tema.id_tema">
-          {{ tema.nombre }}
-        </option>
-      </select>
-      <small *ngIf="formulario.id_asignatura && temasFiltrados.length === 0" class="error">
-        No hay temas disponibles para esta asignatura
-      </small>
-    </div>
+  <!-- Main Content -->
+  <main class="upload-main">
+    <!-- Breadcrumbs -->
+    <nav class="breadcrumbs">
+      <a routerLink="/dashboard" class="breadcrumb-link">Inicio</a>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current">Subir audio</span>
+    </nav>
 
-    <!-- Campo de Archivo de Audio -->
-    <div class="form-group">
-      <label for="archivo">Archivo de Audio:</label>
-      <input 
-        type="file" 
-        id="archivo" 
-        name="archivo"
-        (change)="onFileSelected($event)"
-        accept="audio/*"
-        required
-        class="form-control"
-        [disabled]="cargando"
-      >
-      <small *ngIf="archivoSeleccionado" class="archivo-info">
-        Archivo: {{ archivoSeleccionado.name }}
-      </small>
-      <small *ngIf="!archivoSeleccionado && enviado" class="error">
-        Debe seleccionar un archivo
-      </small>
-    </div>
-
-    <!-- Botón Subir -->
-    <div class="form-actions">
-      <button 
-        type="submit" 
-        [disabled]="!formulario.nombre || !archivoSeleccionado || !formulario.id_tema || cargando"
-        class="btn-subir"
-      >
-        <span *ngIf="!cargando">Subir y Procesar</span>
-        <span *ngIf="cargando">Procesando...</span>
+    <!-- Title -->
+    <div class="upload-header">
+      <button class="btn-back-inline" (click)="volverAtras()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
       </button>
-      <button 
-        type="reset" 
-        class="btn-limpiar"
-        (click)="onLimpiar()"
-        [disabled]="cargando"
-      >
-        Limpiar
-      </button>
+      <div>
+        <h1 class="upload-title">Subir Audio</h1>
+        <p class="upload-subtitle">Selecciona una asignatura, tema y archivo de audio para transcribir</p>
+      </div>
     </div>
 
-    <!-- Mensaje de estado -->
-    <div *ngIf="mensaje" [ngClass]="{'mensaje-exito': !error, 'mensaje-error': error, 'mensaje-info': cargando}">
-      {{ mensaje }}
+    <!-- Form -->
+    <div class="upload-form-card">
+      <form (ngSubmit)="onSubmit()" #audioForm="ngForm">
+        <!-- Campo Nombre -->
+        <div class="form-group">
+          <label for="nombre">Nombre de la transcripción</label>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            [(ngModel)]="formulario.nombre"
+            placeholder="Ej: Clase 1 - Introducción"
+            class="form-control"
+            required
+          >
+        </div>
+
+        <!-- Selector Asignatura -->
+        <div class="form-group">
+          <label for="asignatura">Asignatura</label>
+          <select
+            id="asignatura"
+            name="asignatura"
+            [(ngModel)]="formulario.id_asignatura"
+            (change)="onAsignaturaChange()"
+            class="form-control"
+            required
+          >
+            <option [ngValue]="null">-- Selecciona una asignatura --</option>
+            <option *ngFor="let asig of asignaturas()" [ngValue]="asig.id_asignatura">
+              {{ asig.nombre }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Selector Tema -->
+        <div class="form-group">
+          <label for="tema">Tema</label>
+          <select
+            id="tema"
+            name="tema"
+            [(ngModel)]="formulario.id_tema"
+            class="form-control"
+            [disabled]="!formulario.id_asignatura"
+            required
+          >
+            <option [ngValue]="null">-- Selecciona un tema --</option>
+            <option *ngFor="let tema of temasFiltrados()" [ngValue]="tema.id_tema">
+              {{ tema.nombre }}
+            </option>
+          </select>
+          <small *ngIf="formulario.id_asignatura && temasFiltrados().length === 0" class="form-hint error">
+            No hay temas disponibles para esta asignatura
+          </small>
+        </div>
+
+        <!-- Campo de Archivo -->
+        <div class="form-group">
+          <label for="archivo">Archivo de audio</label>
+          <div class="file-drop-zone" [class.has-file]="archivoSeleccionado">
+            <input
+              type="file"
+              id="archivo"
+              name="archivo"
+              (change)="onFileSelected($event)"
+              accept="audio/*"
+              class="file-input"
+              [disabled]="cargando"
+            >
+            @if (archivoSeleccionado) {
+              <div class="file-info">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span class="file-name">{{ archivoSeleccionado.name }}</span>
+                <span class="file-size">{{ formatearTamano(archivoSeleccionado.size) }}</span>
+              </div>
+            } @else {
+              <div class="file-placeholder">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Haz click o arrastra un archivo de audio</span>
+                <small>MP3, WAV, M4A, OGG</small>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Botones -->
+        <div class="form-actions">
+          <button
+            type="submit"
+            [disabled]="!formulario.nombre || !archivoSeleccionado || !formulario.id_tema || cargando"
+            class="btn-submit"
+          >
+            @if (cargando) {
+              <span>Procesando...</span>
+            } @else {
+              <span>Subir y Procesar</span>
+            }
+          </button>
+          <button
+            type="button"
+            class="btn-clear"
+            (click)="onLimpiar()"
+            [disabled]="cargando"
+          >
+            Limpiar
+          </button>
+        </div>
+
+        <!-- Mensaje -->
+        @if (mensaje) {
+          <div class="mensaje" [class.error]="error" [class.info]="cargando">
+            {{ mensaje }}
+          </div>
+        }
+      </form>
     </div>
-  </form>
+  </main>
+
+  <!-- Footer -->
+  <footer class="dash-footer">
+    <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
+      <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+        <div class="logo">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img-sm" />
+          <span class="logo-text">MINERVA</span>
+        </div>
+        <p class="footer-tagline">Sabiduría para el estudiante moderno.</p>
+      </div>
+      <div style="display: flex; gap: 128px;">
+        <div class="footer-column">
+          <h4>Producto</h4>
+          <a href="#">Características</a>
+          <a href="#">Precio</a>
+        </div>
+        <div class="footer-column">
+          <h4>Legal</h4>
+          <a href="#">Acerca de</a>
+          <a href="#">Contacto</a>
+        </div>
+        <div class="footer-column">
+          <h4>Empresa</h4>
+          <a href="#">Privacidad</a>
+          <a href="#">Términos</a>
+        </div>
+      </div>
+    </div>
+  </footer>
 </div>
