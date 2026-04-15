@@ -1,40 +1,119 @@
-<div class="landing-container">
-  <div class="landing-content">
-    <div class="landing-header">
-      <h1 class="landing-title">Minerva</h1>
-      <p class="landing-subtitle">Gestiona tus actividades académicas</p>
+<!-- Header -->
+<header class="landing-header">
+  <div class="header-inner">
+    <div class="logo">
+      <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
+      <span class="logo-text">MINERVA</span>
     </div>
+    <nav class="header-nav">
+      <a href="#universities" class="nav-link">Colaboradores</a>
+      <a href="#features" class="nav-link">Características</a>
+    </nav>
+    <a [routerLink]="['/registro']" class="btn-header">Comenzar</a>
+  </div>
+</header>
 
-    <div class="landing-description">
-      <p>Bienvenido a Minerva, tu plataforma para organizar, compartir y gestionar todas tus actividades escolares en un solo lugar.</p>
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-image-col">
+      <img src="assets/images/owl-olive-branch.png" alt="Búho de Minerva en rama de olivo" class="hero-img" />
     </div>
-
-    <div class="landing-features">
-      <div class="feature">
-        <h3>📚 Organiza</h3>
-        <p>Gestiona tus actividades y tareas de forma ordenada</p>
-      </div>
-      <div class="feature">
-        <h3>📁 Archiva</h3>
-        <p>Encuentra todos tus documentos en carpetas organizadas</p>
-      </div>
-      <div class="feature">
-        <h3>⚡ Accede</h3>
-        <p>Acceso rápido y sencillo desde cualquier lugar</p>
-      </div>
-    </div>
-
-    <div class="landing-buttons">
-      <button class="btn btn-primary" [routerLink]="['/login']">
-        Iniciar Sesión
-      </button>
-      <button class="btn btn-secondary" [routerLink]="['/registro']">
-        Crear Cuenta
-      </button>
+    <div class="hero-content-col">
+      <h1 class="hero-title">
+        <span class="title-line">SABIDURÍA</span>
+        <span class="title-line">CLÁSICA,</span>
+        <span class="title-line title-accent">TECNOLOGÍA</span>
+        <span class="title-line title-accent">MODERNA</span>
+      </h1>
+      <p class="hero-description">
+        Transforma tus clases en transcripciones organizadas con identificación de hablantes y resúmenes inteligentes.
+      </p>
+      <a [routerLink]="['/registro']" class="btn-hero">Comenzar gratis</a>
+      <p class="hero-note">Sin tarjeta de crédito · Cancela cuando quieras</p>
     </div>
   </div>
+</section>
 
-  <div class="landing-image">
-    <div class="decorative-shape"></div>
+<!-- Universities -->
+<section class="universities" id="universities">
+  <p class="universities-title">Confiado en las mejores universidades</p>
+  <div class="universities-track">
+    <div class="universities-scroll">
+      <!-- Set 1 -->
+      <div class="uni-wrapper" *ngFor="let uni of universities">
+        <a [href]="uni.url" target="_blank" rel="noopener noreferrer" class="uni-link">
+          <div class="uni-item">
+            <img [src]="uni.logo" [alt]="uni.name + ' logo'" class="uni-logo" />
+          </div>
+        </a>
+      </div>
+      <!-- Set 2 (duplicate for seamless loop) -->
+      <div class="uni-wrapper" *ngFor="let uni of universities">
+        <a [href]="uni.url" target="_blank" rel="noopener noreferrer" class="uni-link">
+          <div class="uni-item">
+            <img [src]="uni.logo" [alt]="uni.name + ' logo'" class="uni-logo" />
+          </div>
+        </a>
+      </div>
+    </div>
   </div>
-</div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="features-header">
+    <h2 class="features-title">HERRAMIENTAS</h2>
+    <p class="features-subtitle">Todo lo necesario para transformar tus clases en conocimiento organizado</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card" *ngFor="let feature of features">
+      <div class="feature-icon" [style.background]="feature.bgColor">
+        <svg [innerHTML]="feature.icon" class="feature-icon-svg"></svg>
+      </div>
+      <h3 class="feature-title">{{ feature.title }}</h3>
+      <p class="feature-desc">{{ feature.desc }}</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Final -->
+<section class="cta-final">
+  <div class="cta-bg-pattern"></div>
+  <div class="cta-inner">
+    <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="cta-logo" />
+    <h2 class="cta-title">EMPIEZA TU VIAJE HACIA LA<br/>SABIDURÍA</h2>
+    <p class="cta-desc">Únete a estudiantes que transforman su forma de estudiar con Minerva.</p>
+    <a [routerLink]="['/registro']" class="btn-cta">Crear Cuenta Gratuita</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="landing-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo">
+        <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img-sm" />
+        <span class="logo-text">MINERVA</span>
+      </div>
+      <p class="footer-tagline">Sabiduría para el estudiante moderno.</p>
+    </div>
+    <div class="footer-columns">
+      <div class="footer-column">
+        <h4>Producto</h4>
+        <a href="#features">Características</a>
+        <a href="#">Precio</a>
+      </div>
+      <div class="footer-column">
+        <h4>Legal</h4>
+        <a href="#">Acerca de</a>
+        <a href="#">Contacto</a>
+      </div>
+      <div class="footer-column">
+        <h4>Empresa</h4>
+        <a href="#">Privacidad</a>
+        <a href="#">Términos</a>
+      </div>
+    </div>
+  </div>
+</footer>

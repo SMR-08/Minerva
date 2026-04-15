@@ -16,7 +16,7 @@ export class FormularioRegistroComponent {
     nombre: '',
     email: '',
     contrasena: '',
-    contrasenaConfirmar: ''
+    contrasenaConfirm: ''
   };
 
   mensaje: string = '';
@@ -38,13 +38,13 @@ export class FormularioRegistroComponent {
   onSubmit(): void {
     this.enviado = true;
 
-    if (!this.formulario.nombre || !this.formulario.email || !this.formulario.contrasena || !this.formulario.contrasenaConfirmar) {
+    if (!this.formulario.nombre || !this.formulario.email || !this.formulario.contrasena || !this.formulario.contrasenaConfirm) {
       this.mensaje = 'Por favor, completa todos los campos requeridos';
       this.error = true;
       return;
     }
 
-    if (this.formulario.contrasena !== this.formulario.contrasenaConfirmar) {
+    if (this.formulario.contrasena !== this.formulario.contrasenaConfirm) {
       this.mensaje = 'Las contraseñas no coinciden';
       this.error = true;
       return;
@@ -57,7 +57,6 @@ export class FormularioRegistroComponent {
     }
 
     const datosRegistro = {
-      
       nombre: this.formulario.nombre,
       email: this.formulario.email,
       contrasena: this.formulario.contrasena
@@ -84,7 +83,7 @@ export class FormularioRegistroComponent {
       nombre: '',
       email: '',
       contrasena: '',
-      contrasenaConfirmar: ''
+      contrasenaConfirm: ''
     };
     this.mensaje = '';
     this.error = false;
