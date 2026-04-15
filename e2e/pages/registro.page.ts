@@ -7,18 +7,16 @@ export class RegistroPage {
   readonly inputContrasena: Locator;
   readonly inputContrasenaConfirm: Locator;
   readonly btnRegistrarse: Locator;
-  readonly btnLimpiar: Locator;
   readonly mensaje: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.inputNombre = page.getByLabel('Nombre Completo:');
-    this.inputEmail = page.getByLabel('Email:');
-    this.inputContrasena = page.getByPlaceholder('Mínimo 6 caracteres');
-    this.inputContrasenaConfirm = page.getByPlaceholder('Confirme su contraseña');
-    this.btnRegistrarse = page.getByRole('button', { name: 'Registrarse' });
-    this.btnLimpiar = page.getByRole('button', { name: 'Limpiar' });
-    this.mensaje = page.locator('.mensaje-exito, .mensaje-error');
+    this.inputNombre = page.getByLabel('Tu nombre completo');
+    this.inputEmail = page.getByLabel('Correo Electrónico');
+    this.inputContrasena = page.getByLabel('Contraseña');
+    this.inputContrasenaConfirm = page.getByLabel('Confirmar Contraseña');
+    this.btnRegistrarse = page.getByRole('button', { name: 'REGISTRARSE' });
+    this.mensaje = page.locator('.msg-success, .msg-error');
   }
 
   async goto() {
