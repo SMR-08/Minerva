@@ -12,29 +12,27 @@ setup('authenticate as user', async ({ page }) => {
   // Go to registration
   await page.goto('/registro');
 
-  // Fill registration form using specific selectors
-  await page.getByLabel('Nombre Completo:').fill('Usuario E2E');
-  await page.getByLabel('Email:').fill(email);
-  await page.getByPlaceholder('Mínimo 6 caracteres').fill(password);
-  await page.getByPlaceholder('Confirme su contraseña').fill(password);
+  // Fill registration form
+  await page.getByLabel('Tu nombre completo').fill('Usuario E2E');
+  await page.getByLabel('Correo Electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByLabel('Confirmar Contraseña').fill(password);
 
   // Submit
-  await page.getByRole('button', { name: 'Registrarse' }).click();
+  await page.getByRole('button', { name: 'REGISTRARSE' }).click();
 
-  // Wait for redirect to login (the success message may disappear quickly)
+  // Wait for redirect to login
   await page.waitForURL('**/login', { timeout: 15000 });
-
-  // Small wait to ensure the redirect completed
   await page.waitForTimeout(500);
 
   // Login
-  await page.getByLabel('Email:').fill(email);
-  await page.getByLabel('Contraseña:').fill(password);
-  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await page.getByLabel('Correo Electrónico').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'INICIAR SESIÓN' }).click();
 
   // Wait for dashboard
   await page.waitForURL('**/dashboard', { timeout: 15000 });
-  await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible();
+  await expect(page.locator('.user-avatar')).toBeVisible();
 
   // Save storage state (cookies + localStorage with auth token)
   await page.context().storageState({ path: authFile });
