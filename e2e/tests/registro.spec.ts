@@ -47,8 +47,8 @@ test.describe('Registro de usuario', () => {
     const registro = new RegistroPage(page);
     await registro.goto();
 
-    await page.getByLabel('Nombre Completo:').fill('Usuario Test');
-    await page.getByLabel('Email:').fill('test@prueba.com');
+    await page.getByLabel('Tu nombre completo').fill('Usuario Test');
+    await page.getByLabel('Correo Electrónico').fill('test@prueba.com');
     await registro.inputContrasena.fill('password123');
     await registro.inputContrasenaConfirm.fill('different');
 
@@ -62,8 +62,8 @@ test.describe('Registro de usuario', () => {
     await registro.goto();
 
     // Trigger validation by filling and clearing a field
-    await page.getByLabel('Nombre Completo:').fill('test');
-    await page.getByLabel('Nombre Completo:').fill('');
+    await page.getByLabel('Tu nombre completo').fill('test');
+    await page.getByLabel('Tu nombre completo').fill('');
 
     // Check that button is disabled
     await expect(registro.btnRegistrarse).toBeDisabled();
@@ -73,8 +73,8 @@ test.describe('Registro de usuario', () => {
     const registro = new RegistroPage(page);
     await registro.goto();
 
-    await page.getByLabel('Nombre Completo:').fill('Usuario Test');
-    await page.getByLabel('Email:').fill('short@prueba.com');
+    await page.getByLabel('Tu nombre completo').fill('Usuario Test');
+    await page.getByLabel('Correo Electrónico').fill('short@prueba.com');
     await registro.inputContrasena.fill('123');
     await registro.inputContrasenaConfirm.fill('123');
 

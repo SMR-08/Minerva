@@ -5,16 +5,14 @@ export class LoginPage {
   readonly inputEmail: Locator;
   readonly inputContrasena: Locator;
   readonly btnIngresar: Locator;
-  readonly btnLimpiar: Locator;
   readonly mensaje: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.inputEmail = page.getByLabel('Email:');
-    this.inputContrasena = page.getByLabel('Contraseña:');
-    this.btnIngresar = page.getByRole('button', { name: 'Ingresar' });
-    this.btnLimpiar = page.getByRole('button', { name: 'Limpiar' });
-    this.mensaje = page.locator('.mensaje-exito, .mensaje-error');
+    this.inputEmail = page.getByLabel('Correo Electrónico');
+    this.inputContrasena = page.getByLabel('Contraseña');
+    this.btnIngresar = page.getByRole('button', { name: 'INICIAR SESIÓN' });
+    this.mensaje = page.locator('.msg-success, .msg-error');
   }
 
   async goto() {

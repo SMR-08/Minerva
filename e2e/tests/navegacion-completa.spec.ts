@@ -34,26 +34,27 @@ test.describe('Flujo completo de usuario', () => {
     page.once('dialog', async dialog => {
       await dialog.accept('Programación Web');
     });
-    await page.locator('.tarjeta-nueva').first().click();
-    await expect(page.getByText('Programación Web')).toBeVisible({ timeout: 10000 });
+    await page.locator('.subject-card-new').first().click();
+    await expect(page.locator('.subject-card', { hasText: 'Programación Web' })).toBeVisible({ timeout: 10000 });
 
-    // 6. Navigate to themes
+    // 6. Navigate to themes (separate page now)
     await dashboard.clickAsignatura('Programación Web');
-    await expect(page.getByText('Temas de: Programación Web')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.asignatura-title', { hasText: 'Programación Web' })).toBeVisible({ timeout: 10000 });
 
     // 7. Create theme
     page.once('dialog', async dialog => {
       await dialog.accept('Introducción a APIs REST');
     });
-    await dashboard.btnCrearTema.click();
-    await expect(page.getByText('Introducción a APIs REST')).toBeVisible({ timeout: 10000 });
+    await page.locator('.tema-new-card').click();
+    await expect(page.locator('.tema-name', { hasText: 'Introducción a APIs REST' })).toBeVisible({ timeout: 10000 });
 
-    // 8. Navigate back to asignaturas
-    await dashboard.btnVolver.click();
-    await expect(page.getByText('Mis Asignaturas')).toBeVisible({ timeout: 10000 });
+    // 8. Navigate back to dashboard
+    await page.locator('.btn-back-inline').first().click();
+    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await expect(dashboard.seccionAsignaturas).toBeVisible({ timeout: 10000 });
 
     // 9. Logout
-    await dashboard.btnSalir.click();
+    await dashboard.logout();
     await page.waitForURL('**/login', { timeout: 10000 });
   });
 });

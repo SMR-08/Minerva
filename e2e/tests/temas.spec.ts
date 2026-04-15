@@ -10,20 +10,20 @@ test.describe('Gestión de Temas', () => {
     page.once('dialog', async dialog => {
       await dialog.accept('Asignatura Temas');
     });
-    await page.locator('.tarjeta-nueva').first().click();
-    await expect(page.getByText('Asignatura Temas')).toBeVisible({ timeout: 10000 });
+    await page.locator('.subject-card-new').first().click();
+    await expect(page.locator('.subject-card', { hasText: 'Asignatura Temas' })).toBeVisible({ timeout: 10000 });
 
-    // Navigate to themes view
+    // Navigate to themes view (now a separate page)
     await dashboard.clickAsignatura('Asignatura Temas');
-    await expect(page.getByText('Temas de: Asignatura Temas')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.asignatura-title', { hasText: 'Asignatura Temas' })).toBeVisible({ timeout: 10000 });
 
     // Create a theme
     page.once('dialog', async dialog => {
       await dialog.accept('Tema E2E Test');
     });
-    await dashboard.btnCrearTema.click();
+    await page.locator('.tema-new-card').click();
 
-    await expect(page.getByText('Tema E2E Test')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.tema-name', { hasText: 'Tema E2E Test' })).toBeVisible({ timeout: 10000 });
   });
 
   test('eliminar tema', async ({ page }) => {
@@ -34,19 +34,19 @@ test.describe('Gestión de Temas', () => {
     page.once('dialog', async dialog => {
       await dialog.accept('Asignatura Eliminar Tema');
     });
-    await page.locator('.tarjeta-nueva').first().click();
-    await expect(page.getByText('Asignatura Eliminar Tema')).toBeVisible({ timeout: 10000 });
+    await page.locator('.subject-card-new').first().click();
+    await expect(page.locator('.subject-card', { hasText: 'Asignatura Eliminar Tema' })).toBeVisible({ timeout: 10000 });
 
     // Navigate to themes
     await dashboard.clickAsignatura('Asignatura Eliminar Tema');
-    await expect(page.getByText('Temas de: Asignatura Eliminar Tema')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.asignatura-title', { hasText: 'Asignatura Eliminar Tema' })).toBeVisible({ timeout: 10000 });
 
     // Create a theme
     page.once('dialog', async dialog => {
       await dialog.accept('Tema Para Eliminar');
     });
-    await dashboard.btnCrearTema.click();
-    await expect(page.getByText('Tema Para Eliminar')).toBeVisible({ timeout: 10000 });
+    await page.locator('.tema-new-card').click();
+    await expect(page.locator('.tema-name', { hasText: 'Tema Para Eliminar' })).toBeVisible({ timeout: 10000 });
 
     // Set up persistent dialog handler
     page.on('dialog', async dialog => {
@@ -54,9 +54,10 @@ test.describe('Gestión de Temas', () => {
     });
 
     // Use dispatchEvent to avoid Playwright waiting for dialog
-    await page.locator('.tarjeta-asignatura:not(.tarjeta-nueva) .btn-eliminar').dispatchEvent('click');
+    await page.locator('.tema-section', { hasText: 'Tema Para Eliminar' })
+      .locator('.btn-menu').dispatchEvent('click');
 
     await page.waitForTimeout(2000);
-    await expect(page.getByText('Tema Para Eliminar')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.tema-name', { hasText: 'Tema Para Eliminar' })).not.toBeVisible({ timeout: 10000 });
   });
 });

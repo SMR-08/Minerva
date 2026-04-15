@@ -10,17 +10,17 @@ test.describe('Login de usuario', () => {
     await page.goto('/registro');
     const timestamp = Date.now();
     const email = `login-${timestamp}@prueba.com`;
-    await page.getByLabel('Nombre Completo:').fill('Login User');
-    await page.getByLabel('Email:').fill(email);
-    await page.getByPlaceholder('Mínimo 6 caracteres').fill('password123');
-    await page.getByPlaceholder('Confirme su contraseña').fill('password123');
-    await page.getByRole('button', { name: 'Registrarse' }).click();
+    await page.getByLabel('Tu nombre completo').fill('Login User');
+    await page.getByLabel('Correo Electrónico').fill(email);
+    await page.getByLabel('Contraseña').fill('password123');
+    await page.getByLabel('Confirmar Contraseña').fill('password123');
+    await page.getByRole('button', { name: 'REGISTRARSE' }).click();
     await page.waitForURL('**/login', { timeout: 15000 });
 
     // Now login
     await login.login(email, 'password123');
     await page.waitForURL('**/dashboard', { timeout: 15000 });
-    await expect(page.getByRole('button', { name: 'Salir' })).toBeVisible();
+    await expect(page.locator('.user-avatar')).toBeVisible();
   });
 
   test('login falla con credenciales incorrectas', async ({ page }) => {
@@ -38,7 +38,6 @@ test.describe('Login de usuario', () => {
     const login = new LoginPage(page);
     await login.goto();
 
-    // Button should be disabled when fields are empty
     await expect(login.btnIngresar).toBeDisabled();
   });
 });
