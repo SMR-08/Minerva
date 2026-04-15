@@ -1,0 +1,185 @@
+<div class="transcripcion-page">
+  <div class="dashboard-bg-pattern"></div>
+
+  <!-- Header -->
+  <header class="dash-header">
+    <div class="header-inner">
+      <div class="logo">
+        <a routerLink="/dashboard" class="logo-link">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
+          <span class="logo-text">MINERVA</span>
+        </a>
+      </div>
+      <div class="header-actions">
+        <div class="user-avatar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <div class="user-menu" *ngIf="userMenuOpen">
+            <a (click)="cerrarSesion()" class="menu-item">Cerrar sesión</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="transcripcion-main">
+    @if (transcripcion()) {
+      <!-- Top bar -->
+      <div class="trans-top-bar">
+        <a [routerLink]="['/asignatura', getIdAsignatura()]" class="btn-back-text">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+          Volver a {{ getNombreAsignatura() }}
+        </a>
+        <div class="trans-actions">
+          <button class="btn-action">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+            Compartir
+          </button>
+          <button class="btn-action">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Exportar
+          </button>
+        </div>
+      </div>
+
+      <!-- Content grid -->
+      <div class="trans-content-grid">
+        <!-- Left: Transcription -->
+        <div class="trans-left">
+          <div class="trans-card">
+            <!-- Title -->
+            <h1 class="trans-title">{{ transcripcion()?.titulo }}</h1>
+
+            <!-- Tags -->
+            <div class="trans-tags">
+              <span class="tag tag-asignatura">{{ getNombreAsignatura() }}</span>
+              <span class="tag tag-tema">{{ getNombreTema() }}</span>
+            </div>
+
+            <!-- Meta -->
+            <div class="trans-meta-row">
+              <span class="trans-meta-item">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                {{ transcripcion()?.fecha_procesamiento | date:'dd-MM-yy' }}
+              </span>
+              <span class="trans-meta-item">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                {{ formatearDuracion(transcripcion()?.duracion_segundos || 0) }}
+              </span>
+            </div>
+
+            <!-- Speakers -->
+            <div class="trans-speakers-section">
+              <h3 class="speakers-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                Hablantes
+              </h3>
+              <div class="speakers-list">
+                @for (hablante of getHablanates(); track hablante) {
+                  <span class="speaker-badge" [style.background]="getHablanateBg(hablante)" [style.color]="getHablanateColor(hablante)">
+                    {{ hablante }}
+                  </span>
+                }
+              </div>
+            </div>
+
+            <!-- Transcription segments -->
+            <div class="trans-segments">
+              <h3 class="segments-title">Transcripción</h3>
+              @for (seg of segmentos(); track $index) {
+                <div class="segment-row">
+                  <div class="segment-speaker-col">
+                    <span class="segment-speaker-badge" [style.background]="getHablanateBg(seg.hablante)" [style.color]="getHablanateColor(seg.hablante)">
+                      {{ seg.hablante }}
+                    </span>
+                    <span class="segment-time">{{ formatearTiempo(seg.inicio) }}</span>
+                  </div>
+                  <p class="segment-text">{{ seg.texto }}</p>
+                </div>
+              } @empty {
+                <div class="no-data">
+                  <p>{{ transcripcion()?.texto_plano || 'No hay contenido disponible.' }}</p>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Summary -->
+        <div class="trans-right">
+          <div class="summary-card">
+            <h2 class="summary-title">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD866" stroke-width="1.5">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              Resumen
+            </h2>
+            @if (transcripcion()?.resumen_ia) {
+              <div class="summary-content" [innerHTML]="transcripcion()?.resumen_ia"></div>
+            } @else {
+              <div class="no-data">
+                <p>No hay resumen disponible para esta transcripción.</p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </main>
+
+  <!-- Footer -->
+  <footer class="dash-footer">
+    <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
+      <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+        <div class="logo">
+          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img-sm" />
+          <span class="logo-text">MINERVA</span>
+        </div>
+        <p class="footer-tagline">Sabiduría para el estudiante moderno.</p>
+      </div>
+      <div style="display: flex; gap: 128px;">
+        <div class="footer-column">
+          <h4>Producto</h4>
+          <a href="#">Características</a>
+          <a href="#">Precio</a>
+        </div>
+        <div class="footer-column">
+          <h4>Legal</h4>
+          <a href="#">Acerca de</a>
+          <a href="#">Contacto</a>
+        </div>
+        <div class="footer-column">
+          <h4>Empresa</h4>
+          <a href="#">Privacidad</a>
+          <a href="#">Términos</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>

@@ -9,7 +9,7 @@ import { AuthService } from '../auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './formulario-login.component.html',
-  styleUrls: ['./formulario-login.component.css']
+  styleUrl: './formulario-login.component.css'
 })
 export class FormularioLoginComponent {
   formulario = {
@@ -23,10 +23,6 @@ export class FormularioLoginComponent {
   mostrarContrasena: boolean = false;
 
   constructor(private auth: AuthService, private router: Router) {}
-
-  toggleMostrarContrasena(): void {
-    this.mostrarContrasena = !this.mostrarContrasena;
-  }
 
   onSubmit(): void {
     this.enviado = true;
@@ -49,12 +45,5 @@ export class FormularioLoginComponent {
         this.error = true;
       }
     });
-  }
-
-  onLimpiar(): void {
-    this.formulario = { email: '', contrasena: '' };
-    this.mensaje = '';
-    this.error = false;
-    this.enviado = false;
   }
 }

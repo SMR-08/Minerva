@@ -15,6 +15,7 @@ export interface Tema {
   id_tema: number;
   id_asignatura: number;
   nombre: string;
+  asignatura?: Asignatura;
 }
 
 export interface Transcripcion {
@@ -24,7 +25,8 @@ export interface Transcripcion {
   fecha_procesamiento: string;
   duracion_segundos: number;
   texto_plano?: string;
-  texto_diarizado?: any[]; // Array de segmentos diarizados
+  texto_diarizado?: any[];
+  resumen_ia?: string;
   tema?: {
     nombre: string;
     asignatura?: Asignatura;
@@ -48,9 +50,9 @@ export class MinervaService {
   }
 
   crearTema(idAsignatura: number, nombre: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/temas`, { 
+    return this.http.post<any>(`${this.apiUrl}/temas`, {
       id_asignatura: idAsignatura,
-      nombre: nombre 
+      nombre: nombre
     });
   }
 
@@ -58,7 +60,6 @@ export class MinervaService {
     return this.http.delete<any>(`${this.apiUrl}/temas/${id}`);
   }
 
-  // --- ASIGNATURAS ---
   crearAsignatura(nombre: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/asignaturas`, { nombre });
   }
@@ -67,7 +68,6 @@ export class MinervaService {
     return this.http.delete<any>(`${this.apiUrl}/asignaturas/${id}`);
   }
 
-  // --- TAGS ---
   getTags(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/tags`);
   }
@@ -80,13 +80,16 @@ export class MinervaService {
     return this.http.delete<any>(`${this.apiUrl}/tags/${id}`);
   }
 
-  // --- ARCHIVOS / TRANSCRIPCIONES ---
   subirAudio(formData: FormData, id_tema: number): Observable<any> {
     return this.http.post(`${this.apiUrl}/temas/${id_tema}/procesar-audio`, formData);
   }
 
   getTranscripciones(): Observable<Transcripcion[]> {
     return this.http.get<Transcripcion[]>(`${this.apiUrl}/transcripciones`);
+  }
+
+  getTranscripcion(id: number): Observable<Transcripcion> {
+    return this.http.get<Transcripcion>(`${this.apiUrl}/transcripciones/${id}`);
   }
 
   verificarEstadoIA(): Observable<any> {
