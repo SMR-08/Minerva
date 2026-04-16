@@ -11,10 +11,10 @@ export class RegistroPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.inputNombre = page.getByLabel('Tu nombre completo');
-    this.inputEmail = page.getByLabel('Correo Electrónico');
-    this.inputContrasena = page.getByLabel('Contraseña');
-    this.inputContrasenaConfirm = page.getByLabel('Confirmar Contraseña');
+    this.inputNombre = page.getByLabel('Tu nombre completo', { exact: true });
+    this.inputEmail = page.getByLabel('Correo Electrónico', { exact: true });
+    this.inputContrasena = page.getByLabel('Contraseña', { exact: true });
+    this.inputContrasenaConfirm = page.getByLabel('Confirmar Contraseña', { exact: true });
     this.btnRegistrarse = page.getByRole('button', { name: 'REGISTRARSE' });
     this.mensaje = page.locator('.msg-success, .msg-error');
   }

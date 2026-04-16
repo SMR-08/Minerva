@@ -13,10 +13,10 @@ setup('authenticate as user', async ({ page }) => {
   await page.goto('/registro');
 
   // Fill registration form
-  await page.getByLabel('Tu nombre completo').fill('Usuario E2E');
-  await page.getByLabel('Correo Electrónico').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
-  await page.getByLabel('Confirmar Contraseña').fill(password);
+  await page.getByLabel('Tu nombre completo', { exact: true }).fill('Usuario E2E');
+  await page.getByLabel('Correo Electrónico', { exact: true }).fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(password);
+  await page.getByLabel('Confirmar Contraseña', { exact: true }).fill(password);
 
   // Submit
   await page.getByRole('button', { name: 'REGISTRARSE' }).click();
@@ -26,8 +26,8 @@ setup('authenticate as user', async ({ page }) => {
   await page.waitForTimeout(500);
 
   // Login
-  await page.getByLabel('Correo Electrónico').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
+  await page.getByLabel('Correo Electrónico', { exact: true }).fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'INICIAR SESIÓN' }).click();
 
   // Wait for dashboard
