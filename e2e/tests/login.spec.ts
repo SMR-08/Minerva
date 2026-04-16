@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/login.page';
+import { RegistroPage } from '../pages/registro.page';
 
 test.describe('Login de usuario', () => {
   test('login exitoso con credenciales válidas', async ({ page }) => {
@@ -7,14 +8,11 @@ test.describe('Login de usuario', () => {
     await login.goto();
 
     // First register a user
-    await page.goto('/registro');
+    const registro = new RegistroPage(page);
     const timestamp = Date.now();
     const email = `login-${timestamp}@prueba.com`;
-    await page.getByLabel('Tu nombre completo').fill('Login User');
-    await page.getByLabel('Correo Electrónico').fill(email);
-    await page.getByLabel('Contraseña').fill('password123');
-    await page.getByLabel('Confirmar Contraseña').fill('password123');
-    await page.getByRole('button', { name: 'REGISTRARSE' }).click();
+    await registro.goto();
+    await registro.registrar('Login User', email, 'password123');
     await page.waitForURL('**/login', { timeout: 15000 });
 
     // Now login
