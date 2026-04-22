@@ -11,10 +11,11 @@ export class RegistroPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.inputNombre = page.getByLabel('Tu nombre completo', { exact: true });
-    this.inputEmail = page.getByLabel('Correo Electrónico', { exact: true });
-    this.inputContrasena = page.getByLabel('Contraseña', { exact: true });
-    this.inputContrasenaConfirm = page.getByLabel('Confirmar Contraseña', { exact: true });
+    // Usar id directamente — los labels no tienen atributo "for" en el HTML actual
+    this.inputNombre = page.locator('#nombre');
+    this.inputEmail = page.locator('#email');
+    this.inputContrasena = page.locator('#contrasena');
+    this.inputContrasenaConfirm = page.locator('#contrasenaConfirm');
     this.btnRegistrarse = page.getByRole('button', { name: 'REGISTRARSE' });
     this.mensaje = page.locator('.msg-success, .msg-error');
   }
@@ -37,10 +38,6 @@ export class RegistroPage {
 
   async expectEnabled() {
     await expect(this.btnRegistrarse).toBeEnabled();
-  }
-
-  async expectSuccessMessage(text: string) {
-    await expect(this.mensaje).toContainText(text);
   }
 
   async expectErrorMessage(text: string) {
