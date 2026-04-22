@@ -19,4 +19,10 @@ test.describe('Dashboard', () => {
     await dashboard.goto();
     await expect(dashboard.seccionAsignaturas).toBeVisible();
   });
+
+  test('dashboard muestra botón crear nueva asignatura', async ({ page }) => {
+    const dashboard = new DashboardPage(page);
+    await dashboard.goto();
+    await expect(dashboard.btnCrearNueva).toBeVisible();
+  });
 });
