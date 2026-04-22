@@ -7,18 +7,17 @@ export class RegistroPage {
   readonly inputContrasena: Locator;
   readonly inputContrasenaConfirm: Locator;
   readonly btnRegistrarse: Locator;
-  readonly btnLimpiar: Locator;
   readonly mensaje: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.inputNombre = page.getByLabel('Nombre Completo:');
-    this.inputEmail = page.getByLabel('Email:');
-    this.inputContrasena = page.getByPlaceholder('Mínimo 6 caracteres');
-    this.inputContrasenaConfirm = page.getByPlaceholder('Confirme su contraseña');
-    this.btnRegistrarse = page.getByRole('button', { name: 'Registrarse' });
-    this.btnLimpiar = page.getByRole('button', { name: 'Limpiar' });
-    this.mensaje = page.locator('.mensaje-exito, .mensaje-error');
+    // Usar id directamente — los labels no tienen atributo "for" en el HTML actual
+    this.inputNombre = page.locator('#nombre');
+    this.inputEmail = page.locator('#email');
+    this.inputContrasena = page.locator('#contrasena');
+    this.inputContrasenaConfirm = page.locator('#contrasenaConfirm');
+    this.btnRegistrarse = page.getByRole('button', { name: 'REGISTRARSE' });
+    this.mensaje = page.locator('.msg-success, .msg-error');
   }
 
   async goto() {
@@ -39,10 +38,6 @@ export class RegistroPage {
 
   async expectEnabled() {
     await expect(this.btnRegistrarse).toBeEnabled();
-  }
-
-  async expectSuccessMessage(text: string) {
-    await expect(this.mensaje).toContainText(text);
   }
 
   async expectErrorMessage(text: string) {
