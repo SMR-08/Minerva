@@ -16,4 +16,4 @@ RUN mkdir -p /var/log/nginx
 # Exponer puerto 9122
 EXPOSE 9122
 
-CMD ["sh", "-c", "envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "envsubst '${FRONTEND_UPSTREAM} ${BACKEND_UPSTREAM} ${CORS_ALLOWED_ORIGIN}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
