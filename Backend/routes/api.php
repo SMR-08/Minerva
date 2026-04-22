@@ -13,6 +13,10 @@ use App\Http\Controllers\SseController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Callbacks de IA (autenticados con secret propio, no con Sanctum)
+Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback');
+Route::post('ia/sse-update', [SseController::class, 'sseUpdate']);
+
 // Protected Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -35,10 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // SSE - Actualizaciones en tiempo real
     Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado']);
-
-    // Callbacks de IA (protegido con secret)
-    Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback');
-    Route::post('ia/sse-update', [SseController::class, 'sseUpdate']);
     // Rutas de Administración
     Route::middleware('es_admin')->prefix('admin')->group(function () {
         Route::apiResource('usuarios', \App\Http\Controllers\Admin\UsuarioController::class);
