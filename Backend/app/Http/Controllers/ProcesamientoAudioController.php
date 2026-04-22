@@ -133,9 +133,8 @@ class ProcesamientoAudioController extends Controller
      */
     private function forwardToIA($file, string $uuid, string $idioma): void
     {
-        $callbackUrl = route('ia.callback', [
-            'secret' => config('audio.ia.callback_secret')
-        ]);
+        $laravelUrl = rtrim(config('audio.ia.laravel_url', config('app.url')), '/');
+        $callbackUrl = $laravelUrl . '/api/ia/callback?secret=' . config('audio.ia.callback_secret');
 
         $uploadUrl = config('audio.ia.upload_url');
         $timeout = config('audio.ia.timeout', 7200);
