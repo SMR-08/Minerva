@@ -7,6 +7,7 @@ use App\Models\AudioProcessingJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class SseController extends Controller
 {
@@ -16,18 +17,35 @@ class SseController extends Controller
      */
     public function estado(Request $request, string $uuid)
     {
-        // Headers SSE
+        // Headers CORS y SSE deben ir antes de cualquier salida
+        header('Access-Control-Allow-Origin: ' . ($request->header('Origin') ?? '*'));
+        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
-        header('X-Accel-Buffering: no'); // Nginx: desactivar buffering
+        header('X-Accel-Buffering: no');
         header('Connection: keep-alive');
+        ini_set('output_buffering', 'off');
+        ini_set('zlib.output_compression', false);
+        ob_implicit_flush(true);
+
+        if ($request->isMethod('OPTIONS')) { return; }
+
+        // Autenticar via query param (EventSource no soporta headers)
+        $token = $request->query('token');
+        if (!$token || !PersonalAccessToken::findToken($token)) {
+            echo "data: " . json_encode(['error' => 'No autorizado']) . "\n\n";
+            if (ob_get_level()) ob_flush();
+            flush();
+            return;
+        }
 
         // Buscar transcripción
         $transcripcion = Transcripcion::where('uuid_referencia', $uuid)->first();
 
         if (!$transcripcion) {
             echo "data: " . json_encode(['error' => 'No encontrado']) . "\n\n";
-            ob_flush();
+            if (ob_get_level()) ob_flush();
             flush();
             return;
         }
@@ -68,7 +86,7 @@ class SseController extends Controller
                     break;
 
                 case 'COMPLETADO':
-                    $payload['url'] = route('transcripciones.show', $transcripcion->id_transcripcion);
+                    $payload['url'] = url('/transcripcion/' . $transcripcion->id_transcripcion);
                     $payload['mensaje'] = '¡Completado!';
                     break;
 
@@ -80,7 +98,7 @@ class SseController extends Controller
 
             // Enviar evento SSE
             echo "data: " . json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n\n";
-            ob_flush();
+            if (ob_get_level()) ob_flush();
             flush();
 
             // Salir si está completado o fallido
@@ -91,7 +109,7 @@ class SseController extends Controller
             // Heartbeat: enviar comentario vacío para mantener conexión viva
             if (time() - $lastHeartbeat >= $heartbeatInterval) {
                 echo ": heartbeat\n\n";
-                ob_flush();
+                if (ob_get_level()) ob_flush();
                 flush();
                 $lastHeartbeat = time();
             }
@@ -102,7 +120,7 @@ class SseController extends Controller
             // Timeout después del máximo configurado
             if (time() - $startTime > $timeout) {
                 echo "data: " . json_encode(['error' => 'Timeout de conexión']) . "\n\n";
-                ob_flush();
+                if (ob_get_level()) ob_flush();
                 flush();
                 break;
             }
@@ -127,7 +145,7 @@ class SseController extends Controller
 
         // Contar transcripciones encoladas creadas antes que esta
         $posicion = Transcripcion::where('estado', 'ENCOLADO')
-            ->where('created_at', '<', $transcripcion->created_at)
+            ->where('fecha_grabacion', '<', $transcripcion->fecha_grabacion)
             ->count() + 1;
 
         return max(1, $posicion);
@@ -140,12 +158,12 @@ class SseController extends Controller
     {
         // Obtener estadísticas de procesamiento recientes
         $promedioDuracion = Transcripcion::where('estado', 'COMPLETADO')
-            ->where('created_at', '>', now()->subHours(2))
+            ->where('fecha_grabacion', '>', now()->subHours(2))
             ->avg('duracion_segundos');
 
         $promedioProcesamiento = Transcripcion::where('estado', 'COMPLETADO')
-            ->where('created_at', '>', now()->subHours(2))
-            ->avg(DB::raw('TIMESTAMPDIFF(SECOND, created_at, updated_at)'));
+            ->where('fecha_grabacion', '>', now()->subHours(2))
+            ->avg(DB::raw('TIMESTAMPDIFF(SECOND, fecha_grabacion, fecha_procesamiento)'));
 
         // Si no hay datos, estimar 5 minutos
         if (!$promedioDuracion || !$promedioProcesamiento) {

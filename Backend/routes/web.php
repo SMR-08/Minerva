@@ -28,6 +28,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:web', 'es_admin'])->gr
     Route::get('/debug', [AdminDashboardController::class, 'debug'])->name('debug');
     Route::post('/debug/test-ia', [AdminDashboardController::class, 'testIA'])->name('debug.test-ia');
     Route::post('/debug/upload-audio', [AdminDashboardController::class, 'uploadAudio'])->name('debug.upload-audio');
+    Route::post('/debug/queue-status', [AdminDashboardController::class, 'queueStatus'])->name('debug.queue-status');
     
     // Gestión de Usuarios
     Route::get('/usuarios', [AdminUsuarioController::class, 'indexView'])->name('usuarios.index');
