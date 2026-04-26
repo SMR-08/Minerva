@@ -245,6 +245,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 180px;
+  border-left: 4px solid transparent;
 }
 
 .subject-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
@@ -274,6 +275,14 @@
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.subject-profesor {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--muted-fg);
+  font-style: italic;
+  margin: 4px 0;
 }
 
 .subject-stats {
