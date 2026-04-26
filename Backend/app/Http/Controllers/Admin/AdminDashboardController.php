@@ -7,6 +7,7 @@ use App\Models\Usuario;
 use App\Models\Transcripcion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
@@ -108,6 +109,86 @@ class AdminDashboardController extends Controller
                 'message' => 'Error al procesar subida: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Obtiene el estado completo de la cola de transcripciones.
+     */
+    public function queueStatus()
+    {
+        $colaIA = ['estado' => 'desconocido', 'peticiones_en_espera' => 0];
+        try {
+            $urlIA = config('services.ai_service.url');
+            $res = Http::timeout(3)->get("$urlIA/estado_cola");
+            if ($res->successful()) {
+                $colaIA = $res->json();
+            }
+        } catch (\Exception $e) {
+            $colaIA = ['estado' => 'error', 'error' => $e->getMessage()];
+        }
+
+        $transcripcionesEncoladas = Transcripcion::whereIn('estado', ['ENCOLADO', 'PROCESANDO'])
+            ->with('tema.asignatura')
+            ->orderBy('fecha_grabacion', 'asc')
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id_transcripcion,
+                    'uuid' => $t->uuid_referencia,
+                    'titulo' => $t->titulo,
+                    'estado' => $t->estado,
+                    'progreso' => $t->progreso_porcentaje,
+                    'etapa' => $t->etapa_actual,
+                    'intentos' => $t->intentos,
+                    'asignatura' => $t->tema?->asignatura?->nombre,
+                    'tema' => $t->tema?->nombre,
+                    'fecha' => $t->fecha_grabacion?->format('d/m/Y H:i:s'),
+                ];
+            });
+
+        $ultimasCompletadas = Transcripcion::where('estado', 'COMPLETADO')
+            ->orderBy('fecha_procesamiento', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id_transcripcion,
+                    'titulo' => $t->titulo,
+                    'duracion' => $t->duracion_segundos,
+                    'fecha' => $t->fecha_procesamiento?->format('d/m/Y H:i:s'),
+                ];
+            });
+
+        $ultimasFallidas = Transcripcion::where('estado', 'FALLIDO')
+            ->orderBy('fecha_procesamiento', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id_transcripcion,
+                    'titulo' => $t->titulo,
+                    'error' => $t->error_mensaje,
+                    'intentos' => $t->intentos,
+                    'fecha' => $t->fecha_procesamiento?->format('d/m/Y H:i:s'),
+                ];
+            });
+
+        $estadisticas = [
+            'total_transcripciones' => Transcripcion::count(),
+            'en_espera' => Transcripcion::where('estado', 'ENCOLADO')->count(),
+            'procesando' => Transcripcion::where('estado', 'PROCESANDO')->count(),
+            'completadas' => Transcripcion::where('estado', 'COMPLETADO')->count(),
+            'fallidas' => Transcripcion::where('estado', 'FALLIDO')->count(),
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'cola_ia' => $colaIA,
+            'transcripciones_activas' => $transcripcionesEncoladas,
+            'ultimas_completadas' => $ultimasCompletadas,
+            'ultimas_fallidas' => $ultimasFallidas,
+            'estadisticas' => $estadisticas,
+        ]);
     }
 
     private function getStorageSize()

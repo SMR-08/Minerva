@@ -67,6 +67,109 @@
                 </form>
             </div>
         </div>
+
+        <!-- Queue Status -->
+        <div class="card">
+            <div class="card-header">Estado de la Cola</div>
+            <div class="card-body space-y-4">
+                <p class="text-sm" style="color: #666666;">Monitoriza el estado de la cola de transcripciones.</p>
+
+                <template x-if="!queueLoaded && !queueLoading">
+                    <div class="p-4 rounded-lg text-center" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
+                        <p class="text-sm" style="color: #999999;">Pulsa "Consultar Cola" para ver el estado</p>
+                    </div>
+                </template>
+
+                <template x-if="queueLoading">
+                    <div class="p-4 rounded-lg text-center" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
+                        <p class="text-sm" style="color: #999999;">Consultando cola...</p>
+                    </div>
+                </template>
+
+                <template x-if="queueLoaded">
+                    <div class="space-y-4">
+                        <!-- IA Queue Status -->
+                        <div class="p-4 rounded-lg" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
+                            <h4 class="text-sm font-semibold mb-3" style="color: #1a1a1a;">Microservicio IA</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span style="color: #666666;">Estado:</span>
+                                    <span class="badge" :class="queueData.cola_ia.estado === 'libre' ? 'badge-success' : 'badge-info'" x-text="queueData.cola_ia.estado"></span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span style="color: #666666;">Peticiones en espera:</span>
+                                    <span class="text-sm font-medium" style="color: #1a1a1a;" x-text="queueData.cola_ia.peticiones_en_espera"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="p-3 rounded-lg text-center" style="background: #FFF7ED; border: 1px solid #FED7AA;">
+                                <div class="text-lg font-bold" style="color: #C2410C;" x-text="queueData.estadisticas.en_espera"></div>
+                                <div class="text-xs mt-1" style="color: #C2410C;">En espera</div>
+                            </div>
+                            <div class="p-3 rounded-lg text-center" style="background: #EFF6FF; border: 1px solid #BFDBFE;">
+                                <div class="text-lg font-bold" style="color: #1D4ED8;" x-text="queueData.estadisticas.procesando"></div>
+                                <div class="text-xs mt-1" style="color: #1D4ED8;">Procesando</div>
+                            </div>
+                            <div class="p-3 rounded-lg text-center" style="background: #F0FDF4; border: 1px solid #BBF7D0;">
+                                <div class="text-lg font-bold" style="color: #15803D;" x-text="queueData.estadisticas.completadas"></div>
+                                <div class="text-xs mt-1" style="color: #15803D;">Completadas</div>
+                            </div>
+                            <div class="p-3 rounded-lg text-center" style="background: #FEF2F2; border: 1px solid #FECACA;">
+                                <div class="text-lg font-bold" style="color: #DC2626;" x-text="queueData.estadisticas.fallidas"></div>
+                                <div class="text-xs mt-1" style="color: #DC2626;">Fallidas</div>
+                            </div>
+                        </div>
+
+                        <!-- Active transcriptions -->
+                        <template x-if="queueData.transcripciones_activas && queueData.transcripciones_activas.length > 0">
+                            <div class="p-4 rounded-lg" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
+                                <h4 class="text-sm font-semibold mb-3" style="color: #1a1a1a;">Transcripciones activas</h4>
+                                <div class="space-y-2 max-h-48 overflow-y-auto">
+                                    <template x-for="t in queueData.transcripciones_activas" :key="t.id">
+                                        <div class="flex items-center justify-between p-2 rounded" style="background: #FFFFFF; border: 1px solid #E5E7EB;">
+                                            <div class="flex-1 min-w-0 mr-3">
+                                                <p class="text-sm font-medium truncate" x-text="t.titulo"></p>
+                                                <p class="text-xs" style="color: #999999;" x-text="t.asignatura + ' / ' + t.tema"></p>
+                                            </div>
+                                            <div class="flex items-center gap-2 flex-shrink-0">
+                                                <span class="text-xs badge" :class="t.estado === 'ENCOLADO' ? 'badge-info' : 'badge-success'" x-text="t.estado"></span>
+                                                <template x-if="t.estado === 'PROCESANDO'">
+                                                    <span class="text-xs" style="color: #666666;" x-text="t.progreso + '%'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Recent errors -->
+                        <template x-if="queueData.ultimas_fallidas && queueData.ultimas_fallidas.length > 0">
+                            <div class="p-4 rounded-lg" style="background: #FEF2F2; border: 1px solid #FECACA;">
+                                <h4 class="text-sm font-semibold mb-3" style="color: #DC2626;">Últimos errores</h4>
+                                <div class="space-y-2 max-h-32 overflow-y-auto">
+                                    <template x-for="f in queueData.ultimas_fallidas" :key="f.id">
+                                        <div class="p-2 rounded text-sm" style="background: #FFFFFF;">
+                                            <p class="font-medium truncate" x-text="f.titulo"></p>
+                                            <p class="text-xs mt-1" style="color: #DC2626;" x-text="f.error"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <button @click="consultarCola" :disabled="queueLoading" class="btn-primary w-full flex items-center justify-center gap-2" :style="queueLoading ? 'opacity: 0.5; cursor: not-allowed;' : ''">
+                    <svg x-show="!queueLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <svg x-show="queueLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Consultar Cola
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Results Console -->
@@ -102,6 +205,9 @@
             lastStatus: null,
             file: null,
             logs: [],
+            queueLoading: false,
+            queueLoaded: false,
+            queueData: null,
             
             addLog(type, content) {
                 this.logs.push({
@@ -188,6 +294,36 @@
                         this.uploading = false;
                         this.progress = 0;
                     }, 1000);
+                }
+            },
+
+            async consultarCola() {
+                this.queueLoading = true;
+                this.addLog('info', 'Consultando estado de la cola...');
+
+                try {
+                    const res = await fetch("{{ route('admin.debug.queue-status') }}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await res.json();
+                    this.queueData = data;
+                    this.queueLoaded = true;
+
+                    const activas = data.transcripciones_activas?.length || 0;
+                    this.addLog('success', {
+                        mensaje: 'Cola consultada correctamente',
+                        ia: data.cola_ia,
+                        estadisticas: data.estadisticas,
+                        activas: activas + ' transcripción(es) en cola'
+                    });
+                } catch (e) {
+                    this.addLog('error', 'Error al consultar cola: ' + e.message);
+                } finally {
+                    this.queueLoading = false;
                 }
             }
         }
