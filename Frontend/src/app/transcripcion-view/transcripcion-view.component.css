@@ -220,13 +220,17 @@
 }
 
 .tag-asignatura {
-  background: #4A6B8A;
-  color: #FFFFFF;
+  transition: all 0.2s;
 }
 
 .tag-tema {
   background: #F0F2F5;
   color: var(--fg);
+}
+.tag-profesor {
+  background: #EEF2F7;
+  color: #4A6B8A;
+  border: 1px solid #C8D6E5;
 }
 
 .trans-meta-row {
@@ -448,6 +452,49 @@
   }
 }
 
+/* ===== ESTADO ALERTA ===== */
+.estado-alerta {
+  max-width: 1000px;
+  margin: 0 auto 24px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+}
+
+.estado-alerta h3 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: 0.03em;
+}
+
+.estado-alerta p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.estado-alerta.error {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.estado-alerta.error h3 {
+  color: #DC2626;
+}
+
+.estado-alerta.pendiente {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E40AF;
+}
+
+.estado-alerta.pendiente h3 {
+  color: #1D4ED8;
+}
+
 @media (max-width: 900px) {
   .header-inner { padding: 12px 24px; }
   .transcripcion-main { padding: 24px 24px 80px; }
@@ -477,3 +524,5 @@
     min-width: auto;
   }
 }
+
+.btn-action-danger:hover { border-color: #DC2626 !important; color: #DC2626 !important; }

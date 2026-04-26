@@ -1,7 +1,6 @@
 <div class="dashboard-page">
   <div class="dashboard-bg-pattern"></div>
 
-  <!-- Header -->
   <header class="dash-header">
     <div class="header-inner">
       <div class="logo">
@@ -22,9 +21,7 @@
     </div>
   </header>
 
-  <!-- Main Content -->
   <main class="dash-main">
-    <!-- Search Bar -->
     <div class="search-bar">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" class="search-icon">
         <circle cx="11" cy="11" r="8"/>
@@ -33,7 +30,6 @@
       <input type="text" placeholder="Buscar asignaturas, temas o transcripciones..." [(ngModel)]="searchQuery" (ngModelChange)="onSearch()" class="search-input" />
     </div>
 
-    <!-- Actividad Reciente -->
     <section class="dash-section">
       <h2 class="section-title">ACTIVIDAD RECIENTE</h2>
       <div class="activity-card">
@@ -61,7 +57,6 @@
       </div>
     </section>
 
-    <!-- Mis Asignaturas -->
     <section class="dash-section">
       <div class="section-header">
         <h2 class="section-title">MIS ASIGNATURAS</h2>
@@ -69,22 +64,39 @@
       </div>
       <div class="subjects-grid">
         @for (asig of asignaturas(); track asig.id_asignatura) {
-          <div class="subject-card" (click)="verAsignatura(asig)">
+          <div class="subject-card" (click)="verAsignatura(asig)" [style.border-left-color]="asig.color_hex || '#4A6B8A'">
             <div class="subject-card-header">
               <div class="folder-icon" [style.color]="asig.color_hex || '#4A6B8A'">
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
               </div>
-              <button class="btn-menu" (click)="openMenu(asig.id_asignatura, $event)" title="Opciones">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5"/>
-                  <circle cx="12" cy="12" r="1.5"/>
-                  <circle cx="12" cy="19" r="1.5"/>
-                </svg>
-              </button>
+              <div class="menu-wrapper" (click)="$event.stopPropagation()">
+                <button class="btn-menu" (click)="toggleMenu(asig.id_asignatura, $event)" title="Opciones">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.5"/>
+                    <circle cx="12" cy="12" r="1.5"/>
+                    <circle cx="12" cy="19" r="1.5"/>
+                  </svg>
+                </button>
+                @if (menuAbiertoId() === asig.id_asignatura) {
+                  <div class="dropdown-menu">
+                    <button class="dropdown-item" (click)="abrirModalEditar(asig, $event)">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Editar
+                    </button>
+                    <button class="dropdown-item dropdown-item-danger" (click)="abrirModalConfirmar(asig, $event)">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Eliminar
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
             <h3 class="subject-name">{{ asig.nombre }}</h3>
+            @if (asig.profesor) {
+              <p class="subject-profesor">{{ asig.profesor }}</p>
+            }
             <div class="subject-stats">
               <span>{{ asig.temas?.length || 0 }} temas</span>
               <span>{{ asig.transcripciones || 0 }} transcripciones</span>
@@ -99,8 +111,7 @@
           </div>
         }
 
-        <!-- Create New -->
-        <div class="subject-card subject-card-new" (click)="crearNuevaAsignatura()">
+        <div class="subject-card subject-card-new" (click)="abrirModalCrear()">
           <div class="new-icon">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -112,8 +123,57 @@
       </div>
     </section>
   </main>
+</div>
 
-  <!-- Footer -->
+<!-- Modales fuera del stacking context de dashboard-page -->
+<app-modal [show]="modalCrear" titulo="Nueva Asignatura" size="sm" (cerrar)="modalCrear = false">
+  <div>
+    <label style="display:block;margin-bottom:6px;font-family:'Cinzel',serif;font-size:0.8rem;font-weight:600;color:#1a1a1a;">Nombre</label>
+    <input type="text" [(ngModel)]="nombreInput" placeholder="Ej: Matemáticas" class="modal-input" (keyup.enter)="crearAsignatura()">
+  </div>
+  <div modal-actions>
+    <button class="btn-modal-secondary" (click)="modalCrear = false">Cancelar</button>
+    <button class="btn-modal-primary" (click)="crearAsignatura()" [disabled]="!nombreInput.trim()">Crear</button>
+  </div>
+</app-modal>
+
+<app-modal [show]="modalEditar" titulo="Editar Asignatura" size="md" (cerrar)="modalEditar = false; asignaturaEditando = null">
+    <div class="modal-form">
+      <div class="modal-field">
+        <label>Nombre</label>
+        <input type="text" [(ngModel)]="nombreInput" placeholder="Nombre de la asignatura" class="modal-input">
+      </div>
+      <div class="modal-field">
+        <label>Profesor</label>
+        <input type="text" [(ngModel)]="profesorInput" placeholder="Nombre del profesor" class="modal-input">
+      </div>
+      <div class="modal-field">
+        <label>Descripción</label>
+        <textarea [(ngModel)]="descripcionInput" placeholder="Breve descripción" class="modal-input modal-textarea" rows="2"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Color</label>
+        <div class="color-picker-row">
+          <input type="color" [(ngModel)]="colorInput" class="modal-color">
+          <span class="color-hex">{{ colorInput }}</span>
+        </div>
+      </div>
+    </div>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalEditar = false; asignaturaEditando = null">Cancelar</button>
+      <button class="btn-modal-primary" (click)="guardarAsignatura()" [disabled]="!nombreInput.trim()">Guardar</button>
+    </div>
+  </app-modal>
+
+  <!-- Modal Confirmar Eliminar -->
+  <app-modal [show]="modalConfirmar" titulo="Eliminar Asignatura" size="sm" (cerrar)="modalConfirmar = false; asignaturaEditando = null">
+    <p>¿Estás seguro de que quieres eliminar <strong>{{ asignaturaEditando?.nombre }}</strong> y todos sus temas y transcripciones? Esta acción no se puede deshacer.</p>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalConfirmar = false; asignaturaEditando = null">Cancelar</button>
+      <button class="btn-modal-danger" (click)="eliminarAsignatura()">Eliminar</button>
+    </div>
+  </app-modal>
+
   <footer class="dash-footer">
     <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
       <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
@@ -142,4 +202,118 @@
       </div>
     </div>
   </footer>
-</div>
+
+<style>
+  .menu-wrapper { position: relative; }
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    min-width: 140px;
+    z-index: 1000;
+    padding: 4px;
+    margin-top: 4px;
+  }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.9rem;
+    color: #1a1a1a;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+  .dropdown-item:hover { background: #F3F4F6; }
+  .dropdown-item-danger { color: #DC2626; }
+  .dropdown-item-danger:hover { background: #FEF2F2; }
+  .modal-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    color: #1a1a1a;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+  .modal-input:focus { border-color: #4A6B8A; }
+  .modal-textarea { resize: vertical; min-height: 60px; }
+  .modal-form { display: flex; flex-direction: column; gap: 16px; }
+  .modal-field label {
+    display: block;
+    margin-bottom: 4px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal-color {
+    width: 40px; height: 40px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 2px;
+    cursor: pointer;
+  }
+  .color-hex {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.9rem;
+    color: #666;
+  }
+  .btn-modal-primary {
+    padding: 8px 20px;
+    background: #FFD866;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-primary:hover { background: #FFC933; }
+  .btn-modal-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-modal-secondary {
+    padding: 8px 20px;
+    background: transparent;
+    color: #666;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-secondary:hover { background: #F3F4F6; color: #1a1a1a; }
+  .btn-modal-danger {
+    padding: 8px 20px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-danger:hover { background: #B91C1C; }
+</style>

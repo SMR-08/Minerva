@@ -1,7 +1,6 @@
 <div class="dashboard-page">
   <div class="dashboard-bg-pattern"></div>
 
-  <!-- Header -->
   <header class="dash-header">
     <div class="header-inner">
       <div class="logo">
@@ -24,17 +23,14 @@
     </div>
   </header>
 
-  <!-- Main Content -->
   <main class="dash-main">
     @if (asignatura()) {
-      <!-- Breadcrumbs -->
       <nav class="breadcrumbs">
         <a routerLink="/dashboard" class="breadcrumb-link">Inicio</a>
         <span class="breadcrumb-sep">›</span>
         <span class="breadcrumb-current">{{ asignatura()?.nombre }}</span>
       </nav>
 
-      <!-- Title -->
       <div class="asignatura-header">
         <a routerLink="/dashboard" class="btn-back-inline">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -42,17 +38,26 @@
           </svg>
         </a>
         <div>
-          <h1 class="asignatura-title">{{ asignatura()?.nombre }}</h1>
+          <h1 class="asignatura-title" [style.color]="asignatura()?.color_hex || 'var(--fg)'">{{ asignatura()?.nombre }}</h1>
+          <div class="asignatura-color-bar" [style.background]="asignatura()?.color_hex || '#4A6B8A'"></div>
+          @if (asignatura()?.profesor) {
+            <p class="asignatura-profesor">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:middle;margin-right:6px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              {{ asignatura()?.profesor }}
+            </p>
+          }
+          @if (asignatura()?.descripcion) {
+            <p class="asignatura-descripcion">{{ asignatura()?.descripcion }}</p>
+          }
           <p class="asignatura-subtitle">{{ temas().length }} temas · {{ totalTranscripciones() }} transcripciones</p>
         </div>
       </div>
 
-      <!-- Temas con transcripciones -->
       @for (tema of temas(); track tema.id_tema) {
         <section class="tema-section">
           <div class="tema-header">
             <div class="tema-title-row">
-              <div class="folder-icon tema-folder" style="color: #D4A843;">
+              <div class="folder-icon tema-folder" style="color: var(--secondary);">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
@@ -62,24 +67,35 @@
             <div class="tema-actions">
               <button class="btn-subir-compact" (click)="subirAudioParaTema(tema)">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
-                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 Subir audio
               </button>
-              <button class="btn-menu" (click)="openTemaMenu(tema.id_tema, $event)" title="Opciones">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5"/>
-                  <circle cx="12" cy="12" r="1.5"/>
-                  <circle cx="12" cy="19" r="1.5"/>
-                </svg>
-              </button>
+              <div class="menu-wrapper">
+                <button class="btn-menu" (click)="toggleMenuTema(tema.id_tema, $event)" title="Opciones">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                  </svg>
+                </button>
+                @if (menuTemaId() === tema.id_tema) {
+                  <div class="dropdown-menu">
+                    <button class="dropdown-item" (click)="abrirModalEditarTema(tema, $event)">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Editar
+                    </button>
+                    <button class="dropdown-item dropdown-item-danger" (click)="abrirModalEliminarTema(tema, $event)">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Eliminar
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
           </div>
 
           <div class="transcripciones-grid">
             @for (trans of transcripcionesPorTema(tema.id_tema); track trans.id_transcripcion) {
-              <div class="transcripcion-card" (click)="verDetalleTranscripcion(trans)">
+              <div class="transcripcion-card" (click)="verDetalleTranscripcion(trans)" [class.trans-fallida]="trans.estado === 'FALLIDO'">
                 <div class="trans-card-top">
                   <div class="trans-icon">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -89,13 +105,40 @@
                       <path d="M10 17h4"/>
                     </svg>
                   </div>
-                  <span class="trans-arrow">›</span>
+                  <div class="menu-wrapper" (click)="$event.stopPropagation()">
+                    <button class="btn-menu-card" (click)="toggleMenuTrans(trans.id_transcripcion, $event)" title="Opciones">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                      </svg>
+                    </button>
+                    @if (menuTransId() === trans.id_transcripcion) {
+                      <div class="dropdown-menu dropdown-menu-left">
+                        <button class="dropdown-item" (click)="abrirModalEditarTrans(trans, $event)">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          Editar título
+                        </button>
+                        <button class="dropdown-item dropdown-item-danger" (click)="abrirModalEliminarTrans(trans, $event)">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          Eliminar
+                        </button>
+                      </div>
+                    }
+                  </div>
                 </div>
                 <h4 class="trans-title">{{ trans.titulo }}</h4>
                 <div class="trans-meta">
                   <span class="trans-date">{{ trans.fecha_procesamiento | date:'dd-MM-yy' }}</span>
-                  <span class="trans-duration">{{ formatearDuracion(trans.duracion_segundos) }}</span>
+                  @if (trans.estado && trans.estado !== 'COMPLETADO') {
+                    <span class="trans-estado-badge" [class.estado-encolado]="trans.estado === 'ENCOLADO'" [class.estado-procesando]="trans.estado === 'PROCESANDO'" [class.estado-fallido]="trans.estado === 'FALLIDO'">
+                      {{ trans.estado }}
+                    </span>
+                  } @else {
+                    <span class="trans-duration">{{ formatearDuracion(trans.duracion_segundos) }}</span>
+                  }
                 </div>
+                @if (trans.estado === 'FALLIDO' && trans.error_mensaje) {
+                  <div class="trans-error-tooltip">{{ trans.error_mensaje }}</div>
+                }
               </div>
             } @empty {
               <div class="no-data tema-empty">
@@ -110,20 +153,71 @@
         </div>
       }
 
-      <!-- Create New Tema -->
-      <div class="subject-card subject-card-new tema-new-card" (click)="crearNuevoTema()">
+      <div class="subject-card subject-card-new tema-new-card" (click)="abrirModalCrearTema()">
         <div class="new-icon">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </div>
         <span class="new-text">Crear Nuevo Tema</span>
       </div>
     }
   </main>
+</div>
 
-  <!-- Footer -->
+<app-modal [show]="modalCrearTema" titulo="Nuevo Tema" size="sm" (cerrar)="modalCrearTema = false">
+    <div>
+      <label style="display:block;margin-bottom:6px;font-family:'Cinzel',serif;font-size:0.8rem;font-weight:600;">Nombre</label>
+      <input type="text" [(ngModel)]="temaInput" placeholder="Ej: Tema 1" class="modal-input" (keyup.enter)="crearTema()">
+    </div>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalCrearTema = false">Cancelar</button>
+      <button class="btn-modal-primary" (click)="crearTema()" [disabled]="!temaInput.trim()">Crear</button>
+    </div>
+  </app-modal>
+
+  <!-- Modal Editar Tema -->
+  <app-modal [show]="modalEditarTema" titulo="Editar Tema" size="sm" (cerrar)="modalEditarTema = false; temaEditando = null">
+    <div>
+      <label style="display:block;margin-bottom:6px;font-family:'Cinzel',serif;font-size:0.8rem;font-weight:600;">Nombre</label>
+      <input type="text" [(ngModel)]="temaInput" class="modal-input" (keyup.enter)="guardarTema()">
+    </div>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalEditarTema = false; temaEditando = null">Cancelar</button>
+      <button class="btn-modal-primary" (click)="guardarTema()" [disabled]="!temaInput.trim()">Guardar</button>
+    </div>
+  </app-modal>
+
+  <!-- Modal Eliminar Tema -->
+  <app-modal [show]="modalEliminarTema" titulo="Eliminar Tema" size="sm" (cerrar)="modalEliminarTema = false; temaEditando = null">
+    <p>¿Eliminar <strong>{{ temaEditando?.nombre }}</strong> y todas sus transcripciones? No se puede deshacer.</p>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalEliminarTema = false; temaEditando = null">Cancelar</button>
+      <button class="btn-modal-danger" (click)="eliminarTema()">Eliminar</button>
+    </div>
+  </app-modal>
+
+  <!-- Modal Editar Transcripción -->
+  <app-modal [show]="modalEditarTrans" titulo="Editar Transcripción" size="sm" (cerrar)="modalEditarTrans = false; transEditando = null">
+    <div>
+      <label style="display:block;margin-bottom:6px;font-family:'Cinzel',serif;font-size:0.8rem;font-weight:600;">Título</label>
+      <input type="text" [(ngModel)]="transTituloInput" class="modal-input" (keyup.enter)="guardarTranscripcion()">
+    </div>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalEditarTrans = false; transEditando = null">Cancelar</button>
+      <button class="btn-modal-primary" (click)="guardarTranscripcion()" [disabled]="!transTituloInput.trim()">Guardar</button>
+    </div>
+  </app-modal>
+
+  <!-- Modal Eliminar Transcripción -->
+  <app-modal [show]="modalEliminarTrans" titulo="Eliminar Transcripción" size="sm" (cerrar)="modalEliminarTrans = false; transEditando = null">
+    <p>¿Eliminar la transcripción <strong>{{ transEditando?.titulo }}</strong>? No se puede deshacer.</p>
+    <div modal-actions>
+      <button class="btn-modal-secondary" (click)="modalEliminarTrans = false; transEditando = null">Cancelar</button>
+      <button class="btn-modal-danger" (click)="eliminarTranscripcion()">Eliminar</button>
+    </div>
+  </app-modal>
+
   <footer class="dash-footer">
     <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
       <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
@@ -152,4 +246,106 @@
       </div>
     </div>
   </footer>
-</div>
+
+<style>
+  .menu-wrapper { position: relative; }
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    min-width: 140px;
+    z-index: 1000;
+    padding: 4px;
+    margin-top: 4px;
+  }
+  .dropdown-menu-left { left: 0; right: auto; }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.9rem;
+    color: #1a1a1a;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .dropdown-item:hover { background: #F3F4F6; }
+  .dropdown-item-danger { color: #DC2626; }
+  .dropdown-item-danger:hover { background: #FEF2F2; }
+  .btn-menu-card {
+    width: 28px; height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #999;
+    transition: all 0.2s;
+  }
+  .btn-menu-card:hover { background: #F3F4F6; color: #1a1a1a; }
+  .modal-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1rem;
+    color: #1a1a1a;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+  .modal-input:focus { border-color: #4A6B8A; }
+  .btn-modal-primary {
+    padding: 8px 20px;
+    background: #FFD866;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-primary:hover { background: #FFC933; }
+  .btn-modal-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-modal-secondary {
+    padding: 8px 20px;
+    background: transparent;
+    color: #666;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-secondary:hover { background: #F3F4F6; color: #1a1a1a; }
+  .btn-modal-danger {
+    padding: 8px 20px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-modal-danger:hover { background: #B91C1C; }
+</style>

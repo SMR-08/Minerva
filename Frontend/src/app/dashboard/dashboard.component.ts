@@ -1,9 +1,11 @@
-import { Component, signal, OnInit, computed } from '@angular/core';
+import { Component, signal, OnInit, computed, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MinervaService, Asignatura, Transcripcion, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
+import { NotificationService } from '../notification.service';
+import { ModalComponent } from '../modal/modal.component';
 
 interface AsignaturaExtended extends Asignatura {
   temas?: Tema[];
@@ -14,7 +16,7 @@ interface AsignaturaExtended extends Asignatura {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet],
+  imports: [CommonModule, FormsModule, RouterLink, ModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -23,6 +25,16 @@ export class DashboardComponent implements OnInit {
   transcripciones = signal<Transcripcion[]>([]);
   searchQuery = '';
   userMenuOpen = false;
+
+  menuAbiertoId = signal<number | null>(null);
+  modalCrear = false;
+  modalEditar = false;
+  modalConfirmar = false;
+  asignaturaEditando: AsignaturaExtended | null = null;
+  nombreInput = '';
+  profesorInput = '';
+  descripcionInput = '';
+  colorInput = '#4A6B8A';
 
   actividades = computed(() => {
     return this.transcripciones()
@@ -42,6 +54,7 @@ export class DashboardComponent implements OnInit {
   constructor(
     private minervaService: MinervaService,
     private authService: AuthService,
+    private notifService: NotificationService,
     private router: Router
   ) {}
 
@@ -118,24 +131,94 @@ export class DashboardComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
-  openMenu(asigId: number, event: Event): void {
-    event.stopPropagation();
-    if (window.confirm('¿Eliminar esta asignatura y todos sus temas y transcripciones?')) {
-      this.minervaService.eliminarAsignatura(asigId).subscribe({
-        next: () => this.cargarDatos(),
-        error: (err) => console.error('Error al eliminar asignatura', err)
-      });
-    }
+  @HostListener('document:click')
+  cerrarMenusGlobal(): void {
+    this.menuAbiertoId.set(null);
   }
 
-  crearNuevaAsignatura(): void {
-    const nombre = window.prompt('Nombre de la nueva asignatura:');
-    if (nombre && nombre.trim()) {
-      this.minervaService.crearAsignatura(nombre.trim()).subscribe({
-        next: () => this.cargarDatos(),
-        error: (err) => console.error('Error al crear asignatura', err)
-      });
-    }
+  toggleMenu(asigId: number, event: Event): void {
+    event.stopPropagation();
+    this.menuAbiertoId.set(this.menuAbiertoId() === asigId ? null : asigId);
+  }
+
+  cerrarMenu(): void {
+    this.menuAbiertoId.set(null);
+  }
+
+  abrirModalCrear(): void {
+    this.nombreInput = '';
+    this.modalCrear = true;
+    this.cerrarMenu();
+  }
+
+  crearAsignatura(): void {
+    if (!this.nombreInput?.trim()) return;
+    this.minervaService.crearAsignatura(this.nombreInput.trim()).subscribe({
+      next: () => {
+        this.modalCrear = false;
+        this.cargarDatos();
+        this.notifService.success('Asignatura creada correctamente');
+      },
+      error: (err) => {
+        console.error('Error al crear asignatura', err);
+        this.notifService.error('Error al crear la asignatura');
+      }
+    });
+  }
+
+  abrirModalEditar(asig: AsignaturaExtended, event: Event): void {
+    event.stopPropagation();
+    this.asignaturaEditando = asig;
+    this.nombreInput = asig.nombre;
+    this.profesorInput = asig.profesor || '';
+    this.descripcionInput = asig.descripcion || '';
+    this.colorInput = asig.color_hex || '#4A6B8A';
+    this.modalEditar = true;
+    this.cerrarMenu();
+  }
+
+  guardarAsignatura(): void {
+    if (!this.nombreInput?.trim() || !this.asignaturaEditando) return;
+    this.minervaService.actualizarAsignatura(this.asignaturaEditando.id_asignatura, {
+      nombre: this.nombreInput.trim(),
+      profesor: this.profesorInput.trim() || undefined,
+      descripcion: this.descripcionInput.trim() || undefined,
+      color_hex: this.colorInput,
+    }).subscribe({
+      next: () => {
+        this.modalEditar = false;
+        this.asignaturaEditando = null;
+        this.cargarDatos();
+        this.notifService.success('Asignatura actualizada');
+      },
+      error: (err) => {
+        console.error('Error al editar asignatura', err);
+        this.notifService.error('Error al editar la asignatura');
+      }
+    });
+  }
+
+  abrirModalConfirmar(asig: AsignaturaExtended, event: Event): void {
+    event.stopPropagation();
+    this.asignaturaEditando = asig;
+    this.modalConfirmar = true;
+    this.cerrarMenu();
+  }
+
+  eliminarAsignatura(): void {
+    if (!this.asignaturaEditando) return;
+    this.minervaService.eliminarAsignatura(this.asignaturaEditando.id_asignatura).subscribe({
+      next: () => {
+        this.modalConfirmar = false;
+        this.asignaturaEditando = null;
+        this.cargarDatos();
+        this.notifService.success('Asignatura eliminada');
+      },
+      error: (err) => {
+        console.error('Error al eliminar asignatura', err);
+        this.notifService.error('Error al eliminar la asignatura');
+      }
+    });
   }
 
   verAsignatura(asignatura: AsignaturaExtended): void {
