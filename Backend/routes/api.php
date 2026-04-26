@@ -17,6 +17,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback');
 Route::post('ia/sse-update', [SseController::class, 'sseUpdate']);
 
+// SSE público (autenticación vía query param para EventSource)
+Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado']);
+
 // Protected Routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -36,9 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('transcripciones', [ProcesamientoAudioController::class, 'index']);
     Route::post('temas/{id}/procesar-audio', [ProcesamientoAudioController::class, 'procesarAudio']);
     Route::get('transcripciones/{id}', [ProcesamientoAudioController::class, 'show']);
+    Route::put('transcripciones/{id}', [ProcesamientoAudioController::class, 'update']);
+    Route::delete('transcripciones/{id}', [ProcesamientoAudioController::class, 'destroy']);
 
-    // SSE - Actualizaciones en tiempo real
-    Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado']);
     // Rutas de Administración
     Route::middleware('es_admin')->prefix('admin')->group(function () {
         Route::apiResource('usuarios', \App\Http\Controllers\Admin\UsuarioController::class);
