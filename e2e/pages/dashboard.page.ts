@@ -5,12 +5,14 @@ export class DashboardPage {
   readonly seccionActividad: Locator;
   readonly seccionAsignaturas: Locator;
   readonly userAvatar: Locator;
+  readonly btnCrearNueva: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.seccionActividad = page.getByRole('heading', { name: 'ACTIVIDAD RECIENTE' });
-    this.seccionAsignaturas = page.getByRole('heading', { name: 'MIS ASIGNATURAS' });
+    this.seccionActividad = page.locator('.section-title', { hasText: 'ACTIVIDAD RECIENTE' });
+    this.seccionAsignaturas = page.locator('.section-title', { hasText: 'MIS ASIGNATURAS' });
     this.userAvatar = page.locator('.user-avatar');
+    this.btnCrearNueva = page.locator('.subject-card.subject-card-new').first();
   }
 
   async goto() {
@@ -23,17 +25,21 @@ export class DashboardPage {
     await expect(this.seccionAsignaturas).toBeVisible();
   }
 
-  async expectAsignaturaVisible(nombre: string) {
-    await expect(this.page.locator('.subject-card', { hasText: nombre })).toBeVisible();
+  async crearAsignatura(nombre: string) {
+    this.page.once('dialog', async dialog => {
+      await dialog.accept(nombre);
+    });
+    await this.btnCrearNueva.click();
+    await expect(this.page.locator('.subject-card', { hasText: nombre })).toBeVisible({ timeout: 10000 });
   }
 
   async clickAsignatura(nombre: string) {
     await this.page.locator('.subject-card:not(.subject-card-new)', { hasText: nombre }).click();
-    await this.page.waitForURL('**/asignatura/*', { timeout: 10000 });
+    await this.page.waitForURL('**/asignatura/**', { timeout: 10000 });
   }
 
   async logout() {
     await this.userAvatar.click();
-    await this.page.getByText('Cerrar sesión').click();
+    await this.page.locator('.menu-item', { hasText: 'Cerrar sesión' }).click();
   }
 }

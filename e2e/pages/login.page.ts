@@ -9,8 +9,8 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.inputEmail = page.getByLabel('Correo Electrónico');
-    this.inputContrasena = page.getByLabel('Contraseña');
+    this.inputEmail = page.locator('#email');
+    this.inputContrasena = page.locator('#contrasena');
     this.btnIngresar = page.getByRole('button', { name: 'INICIAR SESIÓN' });
     this.mensaje = page.locator('.msg-success, .msg-error');
   }
