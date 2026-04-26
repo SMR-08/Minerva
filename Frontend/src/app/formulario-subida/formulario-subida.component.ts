@@ -1,9 +1,11 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { MinervaService, Asignatura, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
+import { SseService, SseEvent } from '../sse.service';
+import { NotificationService } from '../notification.service';
 
 @Component({
   selector: 'app-formulario-subida',
@@ -12,7 +14,7 @@ import { AuthService } from '../auth.service';
   templateUrl: './formulario-subida.component.html',
   styleUrl: './formulario-subida.component.css'
 })
-export class FormularioSubidaComponent implements OnInit {
+export class FormularioSubidaComponent implements OnInit, OnDestroy {
   asignaturas = signal<Asignatura[]>([]);
   temasFiltrados = signal<Tema[]>([]);
 
@@ -29,12 +31,28 @@ export class FormularioSubidaComponent implements OnInit {
   cargando: boolean = false;
   userMenuOpen = false;
 
+  estadoTranscripcion = signal<string>('');
+  progreso = signal<number>(0);
+  etapaActual = signal<string>('');
+  posicionCola = signal<number>(0);
+  etaSegundos = signal<number>(0);
+  transcripcionUrl = signal<string>('');
+  mensajeError = signal<string>('');
+
+  private eventSource: EventSource | null = null;
+
   constructor(
     private minervaService: MinervaService,
+    private sseService: SseService,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private notifService: NotificationService
   ) {}
+
+  ngOnDestroy(): void {
+    this.eventSource?.close();
+  }
 
   ngOnInit(): void {
     this.cargarDatos();
@@ -107,7 +125,15 @@ export class FormularioSubidaComponent implements OnInit {
     }
 
     this.cargando = true;
-    this.mensaje = 'Subiendo y procesando audio...';
+    this.mensaje = 'Subiendo archivo...';
+    this.error = false;
+    this.estadoTranscripcion.set('SUBIENDO');
+    this.progreso.set(0);
+    this.etapaActual.set('');
+    this.posicionCola.set(0);
+    this.etaSegundos.set(0);
+    this.transcripcionUrl.set('');
+    this.mensajeError.set('');
 
     const formData = new FormData();
     formData.append('audio', this.archivoSeleccionado);
@@ -116,17 +142,83 @@ export class FormularioSubidaComponent implements OnInit {
 
     this.minervaService.subirAudio(formData, this.formulario.id_tema).subscribe({
       next: (res) => {
-        this.mensaje = '¡Archivo procesado con éxito!';
-        this.error = false;
-        this.cargando = false;
+        const idAsig = this.formulario.id_asignatura;
+        this.notifService.success('Audio subido. Se procesará en segundo plano.');
+        if (idAsig) {
+          this.router.navigate(['/asignatura', idAsig]);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       },
       error: (err) => {
         console.error('Error subida:', err);
-        this.mensaje = err.error?.error || 'Error al procesar el archivo';
-        this.error = true;
         this.cargando = false;
+        this.estadoTranscripcion.set('FALLIDO');
+        this.mensaje = err.error?.error || 'Error al subir el archivo';
+        this.error = true;
+        this.mensajeError.set(err.error?.details || err.error?.error || 'Error al subir');
+        this.notifService.error(err.error?.error || 'Error al subir el archivo');
       }
     });
+  }
+
+  conectarSSE(uuid: string): void {
+    this.eventSource?.close();
+    const token = this.authService.getUser()?.token || '';
+    this.eventSource = this.sseService.conectar(
+      uuid,
+      token,
+      (event: SseEvent) => this.manejarEventoSSE(event),
+      () => {
+        if (this.estadoTranscripcion() !== 'COMPLETADO' && this.estadoTranscripcion() !== 'FALLIDO') {
+          this.mensaje = 'Conexión perdida. Recarga la página para ver el estado.';
+        }
+      }
+    );
+  }
+
+  manejarEventoSSE(event: SseEvent): void {
+    this.estadoTranscripcion.set(event.estado);
+
+    switch (event.estado) {
+      case 'ENCOLADO':
+        this.cargando = true;
+        this.mensaje = event.mensaje || 'En cola de procesamiento...';
+        this.posicionCola.set(event.posicion || 0);
+        break;
+
+      case 'PROCESANDO':
+        this.cargando = true;
+        this.progreso.set(event.progreso || 0);
+        this.etapaActual.set(event.etapa || '');
+        this.etaSegundos.set(event.eta_segundos || 0);
+        this.mensaje = event.mensaje || 'Procesando...';
+        break;
+
+      case 'COMPLETADO':
+        this.cargando = false;
+        this.mensaje = '¡Transcripción completada!';
+        this.progreso.set(100);
+        this.transcripcionUrl.set(event.url || '');
+        setTimeout(() => {
+          this.notifService.success('Transcripción completada correctamente');
+          const idAsig = this.formulario.id_asignatura;
+          if (idAsig) {
+            this.router.navigate(['/asignatura', idAsig]);
+          } else {
+            this.router.navigate(['/dashboard']);
+          }
+        }, 1500);
+        break;
+
+      case 'FALLIDO':
+        this.cargando = false;
+        this.error = true;
+        this.mensaje = event.mensaje || 'Error en el procesamiento';
+        this.mensajeError.set(event.error || 'Error desconocido');
+        this.notifService.error(event.error || 'Error en el procesamiento');
+        break;
+    }
   }
 
   onLimpiar(): void {
@@ -140,6 +232,13 @@ export class FormularioSubidaComponent implements OnInit {
     this.error = false;
     this.enviado = false;
     this.temasFiltrados.set([]);
+    this.estadoTranscripcion.set('');
+    this.progreso.set(0);
+    this.etapaActual.set('');
+    this.posicionCola.set(0);
+    this.etaSegundos.set(0);
+    this.transcripcionUrl.set('');
+    this.mensajeError.set('');
   }
 
   toggleUserMenu(): void {

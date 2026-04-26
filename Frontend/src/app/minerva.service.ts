@@ -22,11 +22,16 @@ export interface Transcripcion {
   id_transcripcion: number;
   id_tema: number;
   titulo: string;
+  estado?: string;
+  progreso_porcentaje?: number;
+  etapa_actual?: string | null;
+  uuid_referencia?: string;
   fecha_procesamiento: string;
   duracion_segundos: number;
   texto_plano?: string;
   texto_diarizado?: any[];
   resumen_ia?: string;
+  error_mensaje?: string;
   tema?: {
     nombre: string;
     asignatura?: Asignatura;
@@ -90,6 +95,22 @@ export class MinervaService {
 
   getTranscripcion(id: number): Observable<Transcripcion> {
     return this.http.get<Transcripcion>(`${this.apiUrl}/transcripciones/${id}`);
+  }
+
+  actualizarAsignatura(id: number, datos: Partial<Asignatura>): Observable<any> {
+    return this.http.put(`${this.apiUrl}/asignaturas/${id}`, datos);
+  }
+
+  actualizarTema(id: number, datos: { nombre?: string }): Observable<any> {
+    return this.http.put(`${this.apiUrl}/temas/${id}`, datos);
+  }
+
+  actualizarTranscripcion(id: number, datos: { titulo?: string }): Observable<any> {
+    return this.http.put(`${this.apiUrl}/transcripciones/${id}`, datos);
+  }
+
+  eliminarTranscripcion(id: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/transcripciones/${id}`);
   }
 
   verificarEstadoIA(): Observable<any> {

@@ -161,8 +161,62 @@
           </button>
         </div>
 
-        <!-- Mensaje -->
-        @if (mensaje) {
+        <!-- Estado de transcripción en tiempo real -->
+        @if (estadoTranscripcion() === 'ENCOLADO') {
+          <div class="estado-card estado-cola">
+            <div class="estado-header">
+              <span class="estado-badge cola">En cola</span>
+              @if (posicionCola() > 0) {
+                <span class="estado-posicion">Posición: #{{ posicionCola() }}</span>
+              }
+            </div>
+            <p class="estado-mensaje">{{ mensaje }}</p>
+          </div>
+        }
+
+        @if (estadoTranscripcion() === 'PROCESANDO') {
+          <div class="estado-card estado-procesando">
+            <div class="estado-header">
+              <span class="estado-badge procesando">Procesando</span>
+              @if (etaSegundos() > 0) {
+                <span class="estado-eta">ETA: ~{{ etaSegundos() }}s</span>
+              }
+            </div>
+            <div class="barra-progreso">
+              <div class="barra-progreso-fill" [style.width.%]="progreso()"></div>
+            </div>
+            <div class="estado-detalles">
+              <span class="estado-progreso">{{ progreso() }}%</span>
+              @if (etapaActual()) {
+                <span class="estado-etapa">{{ etapaActual() }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (estadoTranscripcion() === 'COMPLETADO') {
+          <div class="estado-card estado-completado">
+            <div class="estado-header">
+              <span class="estado-badge completado">Completado</span>
+            </div>
+            <p class="estado-mensaje">{{ mensaje }}</p>
+          </div>
+        }
+
+        @if (estadoTranscripcion() === 'FALLIDO') {
+          <div class="estado-card estado-fallido">
+            <div class="estado-header">
+              <span class="estado-badge fallido">Error</span>
+            </div>
+            <p class="estado-mensaje">{{ mensaje }}</p>
+            @if (mensajeError()) {
+              <p class="estado-error-detalle">{{ mensajeError() }}</p>
+            }
+          </div>
+        }
+
+        <!-- Mensaje simple (para estados sin SSE) -->
+        @if (mensaje && !estadoTranscripcion()) {
           <div class="mensaje" [class.error]="error" [class.info]="cargando">
             {{ mensaje }}
           </div>
