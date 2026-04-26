@@ -70,6 +70,7 @@ class ProcesamientoAudioController extends Controller
         $maxSize = config('audio.max_size_mb', 2048) * 1024; // MB a KB para Laravel
         $peticion->validate([
             'audio' => 'required|file|mimes:wav,mp3,m4a,flac,ogg|max:' . $maxSize,
+            'nombre' => 'string|max:200',
             'idioma' => 'string|in:auto,es,en',
         ]);
 
@@ -80,13 +81,16 @@ class ProcesamientoAudioController extends Controller
             ->firstOrFail();
         $uuid = Str::uuid()->toString();
 
+        $tituloUsuario = $peticion->input('nombre')
+            ?: pathinfo($peticion->file('audio')->getClientOriginalName(), PATHINFO_FILENAME);
+
         // 2. Crear registro preliminar de Transcripción
         $transcripcion = Transcripcion::create([
             'id_tema' => $tema->id_tema,
             'uuid_referencia' => $uuid,
             'estado' => 'SUBIENDO',
             'nombre_archivo_original' => $peticion->file('audio')->getClientOriginalName(),
-            'titulo' => 'Subiendo: ' . $peticion->file('audio')->getClientOriginalName(),
+            'titulo' => $tituloUsuario,
             'duracion_segundos' => 0,
             'progreso_porcentaje' => 0,
         ]);
@@ -102,7 +106,6 @@ class ProcesamientoAudioController extends Controller
             // 4. Actualizar estado a ENCOLADO
             $transcripcion->update([
                 'estado' => 'ENCOLADO',
-                'titulo' => 'En cola: ' . $transcripcion->nombre_archivo_original,
             ]);
 
             // 5. Retornar UUID para que frontend se suscriba a SSE
@@ -193,13 +196,24 @@ class ProcesamientoAudioController extends Controller
         if ($request->estado === 'COMPLETADO') {
             $resultado = $request->resultado;
 
+            // Reemplazar "Profesor" por el nombre real del profesor si está configurado
+            $nombreProfesor = $transcripcion->tema?->asignatura?->profesor;
+            $transcripcionArray = $resultado['transcripcion'];
+            if ($nombreProfesor) {
+                foreach ($transcripcionArray as &$segmento) {
+                    if (($segmento['hablante'] ?? '') === 'Profesor') {
+                        $segmento['hablante'] = $nombreProfesor;
+                    }
+                }
+                unset($segmento);
+            }
+
             $transcripcion->update([
                 'estado' => 'COMPLETADO',
                 'progreso_porcentaje' => 100,
                 'etapa_actual' => null,
-                'titulo' => 'Transcripción: ' . $transcripcion->nombre_archivo_original,
-                'texto_plano' => collect($resultado['transcripcion'])->pluck('texto')->join("\n"),
-                'texto_diarizado' => $resultado['transcripcion'],
+                'texto_plano' => collect($transcripcionArray)->pluck('texto')->join("\n"),
+                'texto_diarizado' => $transcripcionArray,
                 'duracion_segundos' => $resultado['metricas_rendimiento']['duracion_audio_segundos'] ?? 0,
                 'fecha_procesamiento' => now(),
             ]);
@@ -244,6 +258,53 @@ class ProcesamientoAudioController extends Controller
      */
     public function show(string $id) 
     {
-        return response()->json(Transcripcion::with('tema.asignatura')->findOrFail($id));
+        $transcripcion = Transcripcion::where('id_transcripcion', $id)
+            ->whereHas('tema.asignatura', function ($query) {
+                $query->where('id_usuario', Auth::user()->id_usuario);
+            })
+            ->with('tema.asignatura')
+            ->firstOrFail();
+
+        return response()->json($transcripcion);
+    }
+
+    /**
+     * Actualizar transcripción (título)
+     * PUT /api/transcripciones/{id}
+     */
+    public function update(Request $peticion, string $id)
+    {
+        $transcripcion = Transcripcion::where('id_transcripcion', $id)
+            ->whereHas('tema.asignatura', function ($query) {
+                $query->where('id_usuario', Auth::user()->id_usuario);
+            })
+            ->firstOrFail();
+
+        $peticion->validate([
+            'titulo' => 'required|string|max:200',
+        ]);
+
+        $transcripcion->update([
+            'titulo' => $peticion->titulo,
+        ]);
+
+        return response()->json($transcripcion);
+    }
+
+    /**
+     * Eliminar transcripción
+     * DELETE /api/transcripciones/{id}
+     */
+    public function destroy(string $id)
+    {
+        $transcripcion = Transcripcion::where('id_transcripcion', $id)
+            ->whereHas('tema.asignatura', function ($query) {
+                $query->where('id_usuario', Auth::user()->id_usuario);
+            })
+            ->firstOrFail();
+
+        $transcripcion->delete();
+
+        return response()->json(['message' => 'Transcripción eliminada correctamente']);
     }
 }
