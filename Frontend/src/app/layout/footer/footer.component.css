@@ -3,10 +3,11 @@ footer {
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem 2rem;
-    background-color: var(--color-tech-blue);
-    color: var(--color-text-white);
+    background-color: var(--card);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-body);
     font-size: 0.9rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--muted-fg);
 }
 
 .footer-right {
@@ -15,10 +16,10 @@ footer {
 }
 
 a {
-    color: var(--color-text-white);
+    color: var(--muted-fg);
     text-decoration: none;
 }
 
 a:hover {
-    text-decoration: underline;
+    color: var(--primary);
 }

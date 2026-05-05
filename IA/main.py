@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, Dict, List
+from urllib.parse import urlparse
 import shutil
 
 # Importacion de modulos locales
@@ -88,14 +89,19 @@ async def notificar_a_laravel(uuid: str, estado: str, resultado: dict = None, er
 
 
 async def actualizar_progreso_laravel(uuid: str, estado: str, progreso: int = None, etapa: str = None, callback_url: str = None):
-    """Actualiza el progreso en Laravel vía SSE update."""
+    """Actualiza el progreso en Laravel via SSE update.
+    Deriva la URL base del callback_url (auto-adaptativo a cualquier entorno)."""
     payload = {"uuid": uuid, "estado": estado}
     if progreso is not None:
         payload["progreso"] = progreso
     if etapa is not None:
         payload["etapa"] = etapa
 
-    base = LARAVEL_URL.rstrip('/')
+    if callback_url:
+        parsed = urlparse(callback_url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+    else:
+        base = LARAVEL_URL.rstrip('/')
 
     try:
         async with aiohttp.ClientSession() as session:
