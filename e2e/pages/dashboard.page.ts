@@ -26,10 +26,10 @@ export class DashboardPage {
   }
 
   async crearAsignatura(nombre: string) {
-    this.page.once('dialog', async dialog => {
-      await dialog.accept(nombre);
-    });
     await this.btnCrearNueva.click();
+    await this.page.locator('.modal-input').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator('.modal-input').fill(nombre);
+    await this.page.locator('.btn-modal-primary:visible').click();
     await expect(this.page.locator('.subject-card', { hasText: nombre })).toBeVisible({ timeout: 10000 });
   }
 
