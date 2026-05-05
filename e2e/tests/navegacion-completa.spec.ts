@@ -38,8 +38,9 @@ test.describe('Flujo completo de usuario', () => {
     await expect(page.locator('.asignatura-title', { hasText: 'Programación Web' })).toBeVisible({ timeout: 10000 });
 
     // 7. Crear tema
-    page.once('dialog', async dialog => dialog.accept('Introducción a APIs REST'));
     await page.locator('.tema-new-card').click();
+    await page.locator('.modal-input:visible').fill('Introducción a APIs REST');
+    await page.locator('.btn-modal-primary:visible').click();
     await expect(page.locator('.tema-name', { hasText: 'Introducción a APIs REST' })).toBeVisible({ timeout: 10000 });
 
     // 8. Volver al dashboard

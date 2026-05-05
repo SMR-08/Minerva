@@ -10,8 +10,9 @@ test.describe('Gestión de Temas', () => {
     await dashboard.clickAsignatura('Asignatura Temas');
     await expect(page.locator('.asignatura-title', { hasText: 'Asignatura Temas' })).toBeVisible({ timeout: 10000 });
 
-    page.once('dialog', async dialog => dialog.accept('Tema E2E Test'));
     await page.locator('.tema-new-card').click();
+    await page.locator('.modal-input:visible').fill('Tema E2E Test');
+    await page.locator('.btn-modal-primary:visible').click();
 
     await expect(page.locator('.tema-name', { hasText: 'Tema E2E Test' })).toBeVisible({ timeout: 10000 });
   });
@@ -24,13 +25,15 @@ test.describe('Gestión de Temas', () => {
     await dashboard.clickAsignatura('Asignatura Eliminar Tema');
     await expect(page.locator('.asignatura-title', { hasText: 'Asignatura Eliminar Tema' })).toBeVisible({ timeout: 10000 });
 
-    page.once('dialog', async dialog => dialog.accept('Tema Para Eliminar'));
     await page.locator('.tema-new-card').click();
+    await page.locator('.modal-input:visible').fill('Tema Para Eliminar');
+    await page.locator('.btn-modal-primary:visible').click();
     await expect(page.locator('.tema-name', { hasText: 'Tema Para Eliminar' })).toBeVisible({ timeout: 10000 });
 
-    page.on('dialog', async dialog => dialog.accept());
     await page.locator('.tema-section', { hasText: 'Tema Para Eliminar' })
-      .locator('.btn-menu').dispatchEvent('click');
+      .locator('.btn-menu').click();
+    await page.locator('.dropdown-item-danger', { hasText: 'Eliminar' }).click();
+    await page.locator('.btn-modal-danger:visible').click();
 
     await expect(page.locator('.tema-name', { hasText: 'Tema Para Eliminar' }))
       .not.toBeVisible({ timeout: 10000 });
