@@ -23,10 +23,10 @@ test.describe('Gestión de Asignaturas', () => {
     const nombre = `Para Eliminar ${Date.now()}`;
     await dashboard.crearAsignatura(nombre);
 
-    // Abrir menú de opciones y confirmar eliminación
-    page.on('dialog', async dialog => dialog.accept());
-    await page.locator('.subject-card:not(.subject-card-new)', { hasText: nombre })
-      .locator('.btn-menu').dispatchEvent('click');
+    const card = page.locator('.subject-card:not(.subject-card-new)', { hasText: nombre });
+    await card.locator('.btn-menu').click();
+    await page.locator('.dropdown-item-danger', { hasText: 'Eliminar' }).click();
+    await page.locator('.btn-modal-danger:visible').click();
 
     await expect(page.locator('.subject-card', { hasText: nombre }))
       .not.toBeVisible({ timeout: 10000 });
