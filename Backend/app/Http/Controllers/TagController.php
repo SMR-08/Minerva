@@ -2,24 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\TagResource;
 use App\Models\Tag;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class TagController extends Controller
 {
-    /**
-     * Listar etiquetas del usuario autenticado.
-     */
-    public function index()
+    public function index(Request $peticion)
     {
-        $tags = Tag::where('id_usuario', Auth::user()->id_usuario)->get();
-        return response()->json($tags);
+        $tags = Tag::where('id_usuario', $peticion->user()->id_usuario)->get();
+
+        return TagResource::collection($tags);
     }
 
-    /**
-     * Crear una nueva etiqueta.
-     */
     public function store(Request $peticion)
     {
         $peticion->validate([
@@ -28,21 +23,18 @@ class TagController extends Controller
         ]);
 
         $tag = Tag::create([
-            'id_usuario' => Auth::user()->id_usuario,
+            'id_usuario' => $peticion->user()->id_usuario,
             'nombre' => $peticion->nombre,
             'color_hex' => $peticion->color_hex ?? '#6B7280',
         ]);
 
-        return response()->json($tag, 201);
+        return new TagResource($tag);
     }
 
-    /**
-     * Eliminar una etiqueta.
-     */
-    public function destroy(string $id)
+    public function destroy(Request $peticion, string $id)
     {
         $tag = Tag::where('id_tag', $id)
-            ->where('id_usuario', Auth::user()->id_usuario)
+            ->where('id_usuario', $peticion->user()->id_usuario)
             ->firstOrFail();
 
         $tag->delete();

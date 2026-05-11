@@ -11,6 +11,7 @@ class Tag extends Model
 
     protected $table = 'tags';
     protected $primaryKey = 'id_tag';
+    // $timestamps = false porque la tabla no tiene columnas 'created_at' ni 'updated_at'
     public $timestamps = false;
 
     protected $fillable = ['id_usuario', 'nombre', 'color_hex'];
