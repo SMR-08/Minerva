@@ -2,8 +2,9 @@ import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../auth.service';
-import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-formulario-registro',
@@ -13,8 +14,6 @@ import { Subject, takeUntil } from 'rxjs';
   styleUrl: './formulario-registro.component.css'
 })
 export class FormularioRegistroComponent implements OnDestroy {
-  private destroy$ = new Subject<void>();
-
   formulario = {
     nombre: '',
     email: '',
@@ -27,6 +26,8 @@ export class FormularioRegistroComponent implements OnDestroy {
   enviado: boolean = false;
   mostrarContrasena: boolean = false;
   mostrarContrasenaConfirm: boolean = false;
+
+  private destroy$ = new Subject<void>();
 
   constructor(private authService: AuthService, private router: Router) {}
 
@@ -70,9 +71,7 @@ export class FormularioRegistroComponent implements OnDestroy {
       contrasena: this.formulario.contrasena
     };
 
-    this.authService.registerUser(datosRegistro).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
+    this.authService.registerUser(datosRegistro).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.mensaje = 'Registro completado exitosamente. Ya puedes iniciar sesión.';
         this.error = false;

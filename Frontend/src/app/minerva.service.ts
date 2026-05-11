@@ -33,6 +33,7 @@ export interface Transcripcion {
   resumen_ia?: string;
   error_mensaje?: string;
   tema?: {
+    id_tema?: number;
     nombre: string;
     asignatura?: Asignatura;
   };
@@ -65,8 +66,8 @@ export class MinervaService {
     return this.http.delete<any>(`${this.apiUrl}/temas/${id}`);
   }
 
-  crearAsignatura(nombre: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/asignaturas`, { nombre });
+  crearAsignatura(nombre: string, color_hex?: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/asignaturas`, { nombre, color_hex });
   }
 
   eliminarAsignatura(id: number): Observable<any> {

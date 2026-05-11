@@ -1,7 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../auth.service';
 
 @Component({
@@ -11,7 +13,7 @@ import { AuthService } from '../auth.service';
   templateUrl: './formulario-login.component.html',
   styleUrl: './formulario-login.component.css'
 })
-export class FormularioLoginComponent {
+export class FormularioLoginComponent implements OnDestroy {
   formulario = {
     email: '',
     contrasena: ''
@@ -22,7 +24,14 @@ export class FormularioLoginComponent {
   enviado: boolean = false;
   mostrarContrasena: boolean = false;
 
+  private destroy$ = new Subject<void>();
+
   constructor(private auth: AuthService, private router: Router) {}
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   onSubmit(): void {
     this.enviado = true;
@@ -32,7 +41,7 @@ export class FormularioLoginComponent {
       return;
     }
 
-    this.auth.login(this.formulario.email, this.formulario.contrasena).subscribe({
+    this.auth.login(this.formulario.email, this.formulario.contrasena).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.mensaje = 'Ingreso exitoso';
         this.error = false;
