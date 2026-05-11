@@ -24,9 +24,11 @@ return [
         'salida' => env('RUTA_SALIDA', '/app/compartido/salida'),
     ],
 
-    // Configuración de IA
+    // Configuración de IA — fuente de verdad UNIFICADA
+    // Todas las referencias a servicios de IA deben usar config('audio.ia.*')
+    // Variables de entorno: IA_UPLOAD_URL, LARAVEL_URL, IA_CALLBACK_SECRET, AI_TIMEOUT, AI_INPUT_PATH
     'ia' => [
-        // URL para upload streaming
+        // URL para upload streaming (ASR)
         'upload_url' => env('IA_UPLOAD_URL', 'http://minerva-asr:8000'),
 
         // URL de Laravel vista desde IA (para callbacks)
@@ -37,12 +39,18 @@ return [
 
         // Timeout para procesamiento (segundos)
         'timeout' => env('AI_TIMEOUT', 7200), // 2 horas
+
+        // Ruta de entrada para archivos de audio (modo legacy/admin)
+        'input_path' => env('AI_INPUT_PATH', '/app/compartido/entrada'),
     ],
 
     // SSE (Server-Sent Events)
     'sse' => [
         // Intervalo entre heartbeats (segundos)
         'heartbeat_seconds' => env('SSE_HEARTBEAT_SECONDS', 30),
+
+        // Intervalo de sondeo entre actualizaciones (microsegundos)
+        'poll_interval_microseconds' => env('SSE_POLL_INTERVAL_MICROSECONDS', 2000000),  // 2 segundos
 
         // Timeout máximo de conexión (segundos)
         'timeout_seconds' => 7200, // 2 horas
@@ -51,7 +59,7 @@ return [
     // Cola de procesamiento
     'queue' => [
         // Conexión de cola
-        'connection' => env('QUEUE_CONNECTION', 'database'),
+        'connection' => env('QUEUE_CONNECTION', 'redis'),
 
         // Nombre de la cola
         'queue' => 'process_audio',

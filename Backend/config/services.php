@@ -35,9 +35,4 @@ return [
         ],
     ],
 
-    'ai_service' => [
-        'url' => env('AI_SERVICE_URL', 'http://ars-asr-api:8000'),
-        'input_path' => env('AI_INPUT_PATH', 'AI_Input'),
-    ],
-
 ];
