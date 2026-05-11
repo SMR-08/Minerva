@@ -14,6 +14,20 @@ pest()->extends(Tests\TestCase::class)->use(Illuminate\Foundation\Testing\Refres
 
 /*
 |--------------------------------------------------------------------------
+| Database Seeding
+|--------------------------------------------------------------------------
+|
+| Los roles y estados de usuario se movieron de la migración al
+| DatabaseSeeder por buenas prácticas. Los tests los necesitan,
+| así que ejecutamos el seeder antes de cada test de Feature.
+|
+*/
+uses()->beforeEach(function () {
+    $this->seed(\Database\Seeders\DatabaseSeeder::class);
+})->in('Feature');
+
+/*
+|--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
 |

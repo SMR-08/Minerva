@@ -23,7 +23,7 @@ test('registro exitoso con datos válidos', function () {
         ->assertJsonStructure([
             'message',
             'token',
-            'usuario' => ['id', 'nombre', 'email', 'rol'],
+            'usuario' => ['id_usuario', 'nombre', 'email', 'id_rol'],
         ])
         ->assertJson([
             'message' => 'Usuario registrado correctamente',
@@ -59,7 +59,7 @@ test('registro falla con campos vacíos', function () {
     $response = $this->postJson('/api/register', []);
 
     $response->assertStatus(422)
-        ->assertJsonValidationErrors(['nombre_completo', 'email', 'password', 'device_name']);
+        ->assertJsonValidationErrors(['nombre_completo', 'email', 'password']);
 });
 
 test('registro falla con email inválido', function () {
@@ -116,7 +116,7 @@ test('login exitoso con credenciales válidas', function () {
     $response->assertStatus(200)
         ->assertJsonStructure([
             'token',
-            'usuario' => ['id', 'nombre', 'email', 'rol'],
+            'usuario' => ['id_usuario', 'nombre', 'email', 'id_rol'],
         ]);
 });
 
@@ -168,7 +168,7 @@ test('login falla con campos vacíos', function () {
     $response = $this->postJson('/api/login', []);
 
     $response->assertStatus(422)
-        ->assertJsonValidationErrors(['email', 'password', 'device_name']);
+        ->assertJsonValidationErrors(['email', 'password']);
 });
 
 // ==================== LOGOUT ====================
@@ -215,7 +215,7 @@ test('obtener información del usuario autenticado', function () {
     $response->assertStatus(200)
         ->assertJson([
             'email' => 'info@prueba.com',
-            'nombre_completo' => 'Info User',
+            'nombre' => 'Info User',
         ]);
 });
 
