@@ -26,6 +26,7 @@ if CALLBACK_SECRET == DEFAULT_SECRET:
     warnings.warn("ADVERTENCIA: CALLBACK_SECRET usa el valor por defecto. Genera uno seguro con: openssl rand -base64 32")
 RUTA_TEMPORAL = os.environ.get("RUTA_TEMPORAL", "/tmp")
 NOMBRE_ARCHIVO_CONVERSACION = os.environ.get("NOMBRE_ARCHIVO_CONVERSACION", "conversacion.json")
+# CORS_ORIGINS: específico de FastAPI/ASR (no confundir con CORS_ALLOWED_ORIGINS del Nginx Gateway)
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 
 # MODELOS DE DATOS

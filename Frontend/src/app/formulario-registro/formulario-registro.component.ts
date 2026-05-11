@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-formulario-registro',
@@ -11,7 +12,9 @@ import { AuthService } from '../auth.service';
   templateUrl: './formulario-registro.component.html',
   styleUrl: './formulario-registro.component.css'
 })
-export class FormularioRegistroComponent {
+export class FormularioRegistroComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
+
   formulario = {
     nombre: '',
     email: '',
@@ -26,6 +29,11 @@ export class FormularioRegistroComponent {
   mostrarContrasenaConfirm: boolean = false;
 
   constructor(private authService: AuthService, private router: Router) {}
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   toggleMostrarContrasena(): void {
     this.mostrarContrasena = !this.mostrarContrasena;
@@ -50,8 +58,8 @@ export class FormularioRegistroComponent {
       return;
     }
 
-    if (this.formulario.contrasena.length < 6) {
-      this.mensaje = 'La contraseña debe tener al menos 6 caracteres';
+    if (this.formulario.contrasena.length < 8) {
+      this.mensaje = 'La contraseña debe tener al menos 8 caracteres';
       this.error = true;
       return;
     }
@@ -62,7 +70,9 @@ export class FormularioRegistroComponent {
       contrasena: this.formulario.contrasena
     };
 
-    this.authService.registerUser(datosRegistro).subscribe({
+    this.authService.registerUser(datosRegistro).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe({
       next: (res) => {
         this.mensaje = 'Registro completado exitosamente. Ya puedes iniciar sesión.';
         this.error = false;

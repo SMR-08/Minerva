@@ -121,13 +121,11 @@ services:
       - REDIS_HOST=minerva-redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=null
-      - AI_BACKEND_URL=${AI_BACKEND_URL:-http://minerva-asr:8000}
-      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://minerva-asr:8000}
-      - AI_INPUT_PATH=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - AI_TIMEOUT=${AI_TIMEOUT:-300}
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
       - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
+      - AI_TIMEOUT=${AI_TIMEOUT:-7200}
     networks:
       - minerva-network
     depends_on:
@@ -316,6 +314,7 @@ services:
       - NOMBRE_ARCHIVO_CONVERSACION=${NOMBRE_ARCHIVO_CONVERSACION:-conversacion.json}
       - LARAVEL_URL=${LARAVEL_URL:-http://192.168.18.35:9122}
       - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - RUTA_TEMPORAL=/tmp
     deploy:
       resources:
         limits:

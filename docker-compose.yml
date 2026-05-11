@@ -25,7 +25,8 @@ services:
     networks:
       - minerva-network
     depends_on:
-      - laravel-web
+      minerva-diarizador:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4200"]
       interval: 30s
@@ -76,8 +77,6 @@ services:
       - REDIS_HOST=minerva-redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=null
-      - AI_BACKEND_URL=${AI_BACKEND_URL:-http://minerva-asr:8000}
-      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://minerva-asr:8000}
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
       - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
@@ -211,6 +210,7 @@ services:
       - ia_cache_hf:/root/.cache/huggingface
       - ia_cache_torch:/root/.cache/torch
     environment:
+      - GPU_MODE=${GPU_MODE:-compact}
       - MODELO_ASR=${MODELO_ASR:-Qwen/Qwen3-ASR-1.7B}
       - MODELO_ALIGNER=${MODELO_ALIGNER:-Qwen/Qwen3-ForcedAligner-0.6B}
       - DISPOSITIVO_ASR=${DISPOSITIVO_ASR:-cuda:0}
@@ -225,6 +225,9 @@ services:
     restart: unless-stopped
     networks:
       - minerva-network
+    depends_on:
+      minerva-diarizador:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/estado"]
       interval: 30s

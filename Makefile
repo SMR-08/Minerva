@@ -84,6 +84,10 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 			echo "$(ROJO)❌ ERROR: Debes cambiar DB_PASSWORD/DB_ROOT_PASSWORD en .env$(RESET)"; \
 			exit 1; \
 		fi; \
+		if grep -E "cambiar_por_secret|cambia_esto" .env 2>/dev/null; then \
+			echo "$(AMARILLO)⚠️  ADVERTENCIA: IA_CALLBACK_SECRET contiene valor por defecto.$(RESET)"; \
+			echo "$(AMARILLO)   Genera uno seguro: openssl rand -base64 32$(RESET)"; \
+		fi; \
 	else \
 		if [ ! -f .env ]; then \
 			echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
@@ -91,7 +95,14 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 		else \
 			echo "$(VERDE)✓ .env ya existe.$(RESET)"; \
 		fi; \
-	fi
+		if grep -E "cambiar_por_secret|cambia_esto" .env 2>/dev/null; then \
+			echo "$(AMARILLO)⚠️  ADVERTENCIA: IA_CALLBACK_SECRET contiene valor por defecto.$(RESET)"; \
+			echo "$(AMARILLO)   Genera uno seguro: openssl rand -base64 32$(RESET)"; \
+		fi; \
+		if grep -q "root_secret" .env 2>/dev/null; then \
+			echo "$(AMARILLO)⚠️  ADVERTENCIA: DB_ROOT_PASSWORD contiene valor por defecto ($(shell grep 'DB_ROOT_PASSWORD' .env | head -1)).$(RESET)"; \
+			echo "$(AMARILLO)   Cambialo antes de desplegar en produccion.$(RESET)"; \
+		fi;
 	@# 2. Verificar y generar APP_KEY si está vacía
 	@if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
 		echo "$(AMARILLO)🔑 Generando APP_KEY...$(RESET)"; \
@@ -177,9 +188,17 @@ generar-env-laravel: ## 🔧 Generar Backend/.env desde el .env global
 	@echo "CACHE_STORE=$(CACHE_STORE)" >> Backend/.env
 	@echo "MAIL_MAILER=$(MAIL_MAILER)" >> Backend/.env
 	@echo "AI_BACKEND_URL=$(AI_BACKEND_URL)" >> Backend/.env
-	@echo "AI_SERVICE_URL=$(AI_SERVICE_URL)" >> Backend/.env
 	@echo "AI_INPUT_PATH=$(RUTA_CONTENEDOR_ENTRADA)" >> Backend/.env
 	@echo "AI_TIMEOUT=$(AI_TIMEOUT)" >> Backend/.env
+	@echo "IA_UPLOAD_URL=$(IA_UPLOAD_URL)" >> Backend/.env
+	@echo "LARAVEL_URL=$(LARAVEL_URL)" >> Backend/.env
+	@echo "IA_CALLBACK_SECRET=$(IA_CALLBACK_SECRET)" >> Backend/.env
+	@echo "AUDIO_MAX_SIZE_MB=$(AUDIO_MAX_SIZE_MB)" >> Backend/.env
+	@echo "REDIS_HOST=$(REDIS_HOST)" >> Backend/.env
+	@echo "REDIS_PASSWORD=$(REDIS_PASSWORD)" >> Backend/.env
+	@echo "REDIS_PORT=$(REDIS_PORT)" >> Backend/.env
+	@echo "SSE_HEARTBEAT_SECONDS=$(SSE_HEARTBEAT_SECONDS)" >> Backend/.env
+	@echo "SSE_POLL_INTERVAL_MICROSECONDS=$(SSE_POLL_INTERVAL_MICROSECONDS)" >> Backend/.env
 	@echo "$(VERDE)✓ Backend/.env generado.$(RESET)"
 
 # ==============================================================================
@@ -240,21 +259,21 @@ back-up: ## Levantar solo Back (DEV: laravel-* + db | PROD: profiles back)
 	@if [ "$(DEV)" = "0" ]; then \
 		$(DC) --profile back up -d; \
 	else \
-		$(DC) up -d laravel-app laravel-web minerva-db; \
+		$(DC) up -d laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
 	fi
 
 back-down: ## Bajar solo Back (DEV: laravel-* + db | PROD: profiles back)
 	@if [ "$(DEV)" = "0" ]; then \
 		$(DC) --profile back stop; \
 	else \
-		$(DC) stop laravel-app laravel-web minerva-db; \
+		$(DC) stop laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
 	fi
 
 back-logs: ## Logs solo Back (DEV: laravel-* + db | PROD: profiles back)
 	@if [ "$(DEV)" = "0" ]; then \
 		$(DC) --profile back logs -f; \
 	else \
-		$(DC) logs -f laravel-app laravel-web minerva-db; \
+		$(DC) logs -f laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
 	fi
 
 ia-up: ## Levantar solo IA (DEV: minerva-* | PROD: profiles ia)
@@ -324,7 +343,7 @@ shell-db: ## 🐚 Acceder a la consola de MariaDB
 
 cola-estado: ## 📊 Ver estado de la cola de procesamiento
 	@echo "$(AZUL)📊 Estado de la cola...$(RESET)"
-	$(DC) exec -T laravel-app php artisan queue:monitor database
+	$(DC) exec -T laravel-app php artisan queue:monitor redis
 
 cola-limpiar: ## 🧹 Limpiar jobs fallidos de la cola
 	@echo "$(AMARILLO)🧹 Limpiando jobs fallidos...$(RESET)"
