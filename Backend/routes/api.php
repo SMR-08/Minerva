@@ -9,30 +9,33 @@ use App\Http\Controllers\ProcesamientoAudioController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\SseController;
 
-// Public Routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// Rutas públicas
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
 // Callbacks de IA (autenticados con secret propio, no con Sanctum)
-Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback');
-Route::post('ia/sse-update', [SseController::class, 'sseUpdate']);
+Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback')->middleware('throttle:30,1');
+Route::post('ia/sse-update', [SseController::class, 'sseUpdate'])->middleware('throttle:30,1');
 
 // SSE público (autenticación vía query param para EventSource)
-Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado']);
+Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado'])->middleware('throttle:60,1');
 
-// Protected Routes
+// Rutas protegidas
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
-    // Asignaturas CRUD
+    // Token temporal para SSE (un solo uso, 30s TTL)
+    Route::post('/sse/token', [SseController::class, 'generarTokenSSE']);
+
+    // CRUD de Asignaturas
     Route::apiResource('asignaturas', AsignaturaController::class);
 
-    // Temas CRUD
+    // CRUD de Temas
     Route::apiResource('temas', TemaController::class);
     
-    // Etiquetas CRUD
-    Route::apiResource('tags', TagController::class);
+    // CRUD de Etiquetas (solo index, store, destroy)
+    Route::apiResource('tags', TagController::class)->only(['index', 'store', 'destroy']);
     
     // Procesamiento de Audio e IA
     Route::get('ia/estado', [ProcesamientoAudioController::class, 'verificarEstado']);
@@ -44,6 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Rutas de Administración
     Route::middleware('es_admin')->prefix('admin')->group(function () {
-        Route::apiResource('usuarios', \App\Http\Controllers\Admin\UsuarioController::class);
+        Route::apiResource('usuarios', \App\Http\Controllers\Admin\UsuarioController::class)->only(['store', 'update', 'destroy']);
     });
 });
