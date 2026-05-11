@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Usuario;
-use App\Models\Rol;
+use App\Http\Resources\UsuarioResource;
 use App\Models\EstadoUsuario;
+use App\Models\Rol;
+use App\Models\Usuario;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class UsuarioController extends Controller
@@ -19,9 +20,6 @@ class UsuarioController extends Controller
         return view('admin.users', compact('usuarios', 'roles', 'estados'));
     }
 
-    /**
-     * Crear un nuevo usuario (ADMIN o USUARIO).
-     */
     public function store(Request $request)
     {
         $reglas = [
@@ -53,15 +51,15 @@ class UsuarioController extends Controller
         ]);
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Usuario creado correctamente', 'usuario' => $usuario], 201);
+            return response()->json([
+                'message' => 'Usuario creado correctamente',
+                'usuario' => new UsuarioResource($usuario),
+            ], 201);
         }
 
         return redirect()->route('admin.usuarios.index')->with('success', 'Usuario creado correctamente.');
     }
 
-    /**
-     * Actualizar usuario.
-     */
     public function update(Request $request, string $id)
     {
         $usuario = Usuario::findOrFail($id);
@@ -93,15 +91,15 @@ class UsuarioController extends Controller
         $usuario->update($datos);
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Usuario actualizado', 'usuario' => $usuario]);
+            return response()->json([
+                'message' => 'Usuario actualizado',
+                'usuario' => new UsuarioResource($usuario),
+            ]);
         }
 
         return redirect()->route('admin.usuarios.index')->with('success', 'Usuario actualizado correctamente.');
     }
 
-    /**
-     * Eliminar usuario.
-     */
     public function destroy(Request $request, string $id)
     {
         $usuario = Usuario::findOrFail($id);

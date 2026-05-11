@@ -4,13 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Transcripcion extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'transcripciones';
     protected $primaryKey = 'id_transcripcion';
+    // $timestamps = false porque la tabla usa 'fecha_grabacion' y 'fecha_procesamiento'
+    // en vez de las columnas por defecto 'created_at' y 'updated_at'
     public $timestamps = false;
 
     protected $fillable = [
