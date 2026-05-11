@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RegisterUserRequest;
+use App\Http\Resources\UsuarioResource;
+use App\Models\HistorialAcceso;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -9,61 +13,28 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // POST /api/register
-    public function register(Request $peticion)
+    public function register(RegisterUserRequest $peticion)
     {
-        $peticion->validate([
-            'nombre_completo' => 'required|string|max:100',
-            'email' => 'required|email|unique:usuarios,email',
-            'password' => 'required|string|min:6',
-            'device_name' => 'required|string',
-        ], [
-            'nombre_completo.required' => 'El nombre completo es obligatorio.',
-            'email.required' => 'El correo electrónico es obligatorio.',
-            'email.email' => 'El correo electrónico no es válido.',
-            'email.unique' => 'Este correo electrónico ya está registrado.',
-            'password.required' => 'La contraseña es obligatoria.',
-            'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
-            'device_name.required' => 'El dispositivo es obligatorio.',
-        ]);
-
         $usuario = Usuario::create([
             'nombre_completo' => $peticion->nombre_completo,
             'email' => $peticion->email,
             'password_hash' => Hash::make($peticion->password),
-            'id_rol' => 2, // 2 = USUARIO (Por defecto)
-            'id_estado' => 1, // 1 = ACTIVO
+            'id_rol' => 2,
+            'id_estado' => 1,
             'ultimo_acceso' => now(),
         ]);
 
-        // Auto-login al registrarse
-        $token = $usuario->createToken($peticion->device_name)->plainTextToken;
+        $token = $usuario->createToken($peticion->device_name ?? 'default')->plainTextToken;
 
         return response()->json([
             'message' => 'Usuario registrado correctamente',
             'token' => $token,
-            'usuario' => [
-                'id' => $usuario->id_usuario,
-                'nombre' => $usuario->nombre_completo,
-                'email' => $usuario->email,
-                'rol' => 'USUARIO',
-            ]
+            'usuario' => new UsuarioResource($usuario),
         ], 201);
     }
 
-    // POST /api/login
-    public function login(Request $peticion)
+    public function login(LoginRequest $peticion)
     {
-        $peticion->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-            'device_name' => 'required',
-        ], [
-            'email.required' => 'El correo electrónico es obligatorio.',
-            'email.email' => 'El correo electrónico no es válido.',
-            'password.required' => 'La contraseña es obligatoria.',
-        ]);
-
         $usuario = Usuario::where('email', $peticion->email)->first();
 
         if (! $usuario || ! Hash::check($peticion->password, $usuario->password_hash)) {
@@ -72,41 +43,37 @@ class AuthController extends Controller
             ]);
         }
 
-        // Verificar estado
-        if ($usuario->id_estado !== 1) { // 1 = ACTIVO
+        if ($usuario->id_estado !== 1) {
             throw ValidationException::withMessages([
                 'email' => ['Tu cuenta no está activa.'],
             ]);
         }
 
-        // Actualizar último acceso
         $usuario->ultimo_acceso = now();
         $usuario->save();
 
-        // Crear token
-        $token = $usuario->createToken($peticion->device_name)->plainTextToken;
+        HistorialAcceso::create([
+            'id_usuario' => $usuario->id_usuario,
+            'ip_acceso' => $peticion->ip(),
+            'user_agent' => $peticion->userAgent(),
+        ]);
+
+        $token = $usuario->createToken($peticion->device_name ?? 'default')->plainTextToken;
 
         return response()->json([
             'token' => $token,
-            'usuario' => [
-                'id' => $usuario->id_usuario,
-                'nombre' => $usuario->nombre_completo,
-                'email' => $usuario->email,
-                'rol' => $usuario->rol->nombre ?? 'USUARIO',
-            ]
+            'usuario' => new UsuarioResource($usuario),
         ]);
     }
 
-    // POST /api/logout
     public function logout(Request $peticion)
     {
         $peticion->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Sesión cerrada correctamente']);
     }
 
-    // GET /api/user
-    public function user(Request $peticion) 
+    public function user(Request $peticion)
     {
-        return $peticion->user()->load('rol');
+        return new UsuarioResource($peticion->user()->load('rol'));
     }
 }

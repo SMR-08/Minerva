@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Usuario;
 use App\Models\Transcripcion;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AdminDashboardController extends Controller
 {
@@ -41,8 +43,8 @@ class AdminDashboardController extends Controller
     public function testIA()
     {
         try {
-            $urlIA = config('services.ai_service.url');
-            $respuesta = Http::timeout(config('services.ai_service.timeout', 120))
+            $urlIA = config('audio.ia.upload_url');
+            $respuesta = Http::timeout(config('audio.ia.timeout', 120))
                              ->get("$urlIA/estado");
 
             if ($respuesta->successful()) {
@@ -53,15 +55,20 @@ class AdminDashboardController extends Controller
                 ]);
             }
 
+            Log::error("La IA respondió con error", ['status' => $respuesta->status()]);
             return response()->json([
-                'status' => 'error',
-                'message' => 'La IA respondió con error: ' . $respuesta->status()
+                'status' => 'error_interno',
+                'message' => 'Error interno al conectar con el servicio de IA'
             ], 502);
 
         } catch (\Exception $e) {
+            Log::error("Fallo la conexión a la IA", [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Fallo la conexión a la IA: ' . $e->getMessage()
+                'message' => 'Error interno al conectar con el servicio de IA'
             ], 500);
         }
     }
@@ -72,19 +79,19 @@ class AdminDashboardController extends Controller
     public function uploadAudio(Request $request)
     {
         $request->validate([
-            'audio' => 'required|file|mimes:mp3,wav,m4a,flac,ogg|max:51200', // max 50MB
+            'audio' => 'required|file|mimes:mp3,wav,m4a,flac,ogg|max:51200', // máximo 50MB
         ]);
 
         try {
             $audio = $request->file('audio');
-            $inputPath = trim(config('services.ai_service.input_path', 'AI_Input'), '"\'');
+            $inputPath = trim(config('audio.ia.input_path', '/app/compartido/entrada'), '"\'');
             $absolutePath = str_starts_with($inputPath, '/') ? $inputPath : base_path($inputPath);
 
             $fileName = time() . '_' . $audio->getClientOriginalName();
             $audio->move($absolutePath, $fileName);
 
-            $urlIA = config('services.ai_service.url');
-            $respuesta = Http::timeout(config('services.ai_service.timeout', 120))
+            $urlIA = config('audio.ia.upload_url');
+            $respuesta = Http::timeout(config('audio.ia.timeout', 120))
                 ->post("$urlIA/transcribir_diarizado", [
                     'nombre_archivo' => $fileName,
                 ]);
@@ -97,16 +104,23 @@ class AdminDashboardController extends Controller
                 ]);
             }
 
+            Log::error("La IA respondió con error", [
+                'status' => $respuesta->status(),
+                'body' => $respuesta->body(),
+            ]);
             return response()->json([
-                'status' => 'error',
-                'message' => 'La IA respondió con error: ' . $respuesta->status(),
-                'details' => $respuesta->body()
+                'status' => 'error_interno',
+                'message' => 'Error interno al conectar con el servicio de IA'
             ], 502);
 
         } catch (\Exception $e) {
+            Log::error("Error al procesar subida de audio", [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al procesar subida: ' . $e->getMessage()
+                'message' => 'Error interno del servidor'
             ], 500);
         }
     }
@@ -116,16 +130,7 @@ class AdminDashboardController extends Controller
      */
     public function queueStatus()
     {
-        $colaIA = ['estado' => 'desconocido', 'peticiones_en_espera' => 0];
-        try {
-            $urlIA = config('services.ai_service.url');
-            $res = Http::timeout(3)->get("$urlIA/estado_cola");
-            if ($res->successful()) {
-                $colaIA = $res->json();
-            }
-        } catch (\Exception $e) {
-            $colaIA = ['estado' => 'error', 'error' => $e->getMessage()];
-        }
+        $colaIA = $this->consultarEstadoColaIA() ?? ['estado' => 'desconocido', 'peticiones_en_espera' => 0];
 
         $transcripcionesEncoladas = Transcripcion::whereIn('estado', ['ENCOLADO', 'PROCESANDO'])
             ->with('tema.asignatura')
@@ -174,6 +179,7 @@ class AdminDashboardController extends Controller
             });
 
         $estadisticas = [
+            'fuente' => 'Base de datos Laravel (jobs procesados por el worker)',
             'total_transcripciones' => Transcripcion::count(),
             'en_espera' => Transcripcion::where('estado', 'ENCOLADO')->count(),
             'procesando' => Transcripcion::where('estado', 'PROCESANDO')->count(),
@@ -183,7 +189,9 @@ class AdminDashboardController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'cola_ia' => $colaIA,
+            'cola_ia' => array_merge($colaIA, [
+                'fuente' => 'API IA (' . config('audio.ia.upload_url') . '/estado_cola)',
+            ]),
             'transcripciones_activas' => $transcripcionesEncoladas,
             'ultimas_completadas' => $ultimasCompletadas,
             'ultimas_fallidas' => $ultimasFallidas,
@@ -193,30 +201,47 @@ class AdminDashboardController extends Controller
 
     private function getStorageSize()
     {
-        // Cálculo básico de espacio en AI_Input (puedes ajustarlo)
-        $inputPath = trim(config('services.ai_service.input_path', 'AI_Input'), '"\'');
-        $path = str_starts_with($inputPath, '/') ? $inputPath : base_path($inputPath);
-        
-        if (!file_exists($path)) return '0 MB';
-        
-        $size = 0;
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path)) as $file) {
-            $size += $file->getSize();
+        try {
+            return Cache::remember('admin.storage_size', now()->addMinutes(5), function () {
+                $inputPath = trim(config('audio.ia.input_path', '/app/compartido/entrada'), '"\'');
+                $path = str_starts_with($inputPath, '/') ? $inputPath : base_path($inputPath);
+
+                if (!file_exists($path)) return '0 MB';
+
+                $size = 0;
+                foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path)) as $file) {
+                    $size += $file->getSize();
+                }
+
+                return round($size / 1024 / 1024, 2) . ' MB';
+            });
+        } catch (\Exception $e) {
+            Log::warning('No se pudo cachear el tamano de almacenamiento', [
+                'exception' => $e->getMessage(),
+            ]);
+            return 'N/A';
         }
-        
-        return round($size / 1024 / 1024, 2) . ' MB';
+    }
+
+    private function consultarEstadoColaIA(): ?array
+    {
+        try {
+            $urlIA = config('audio.ia.upload_url');
+            $res = Http::timeout(3)->get("$urlIA/estado_cola");
+            if ($res->successful()) {
+                return $res->json();
+            }
+        } catch (\Exception $e) {
+            Log::warning("No se pudo consultar el estado de la cola IA", [
+                'exception' => $e->getMessage(),
+            ]);
+        }
+        return null;
     }
 
     private function getAIQueueStatus()
     {
-        try {
-            $urlIA = config('services.ai_service.url');
-            $res = Http::timeout(3)->get("$urlIA/estado_cola");
-            if ($res->successful()) {
-                $data = $res->json();
-                return $data['cola_espera'] ?? 0;
-            }
-        } catch (\Exception $e) {}
-        return 'N/A';
+        $data = $this->consultarEstadoColaIA();
+        return data_get($data, 'cola_espera', 'N/A');
     }
 }

@@ -6,6 +6,7 @@ import json
 import torch
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List
 from urllib.parse import urlparse
@@ -17,10 +18,16 @@ from procesamiento import alinear_transcripcion, suavizar_transcripcion, asignar
 
 # CONFIGURACION
 URL_DIARIZADOR = os.environ.get("URL_DIARIZADOR", "http://diarizador:8000")
-LARAVEL_URL = os.environ.get("LARAVEL_URL", "http://laravel-app:80")
-CALLBACK_SECRET = os.environ.get("CALLBACK_SECRET", "cambia_esto_en_produccion")
+LARAVEL_URL = os.environ.get("LARAVEL_URL", "http://minerva-nginx:80")
+CALLBACK_SECRET = os.environ.get("CALLBACK_SECRET", "cambiar_por_secret_generado_con_openssl_rand_base64_32")
+DEFAULT_SECRET = "cambiar_por_secret_generado_con_openssl_rand_base64_32"
+if CALLBACK_SECRET == DEFAULT_SECRET:
+    import warnings
+    warnings.warn("ADVERTENCIA: CALLBACK_SECRET usa el valor por defecto. Genera uno seguro con: openssl rand -base64 32")
 RUTA_TEMPORAL = os.environ.get("RUTA_TEMPORAL", "/tmp")
 NOMBRE_ARCHIVO_CONVERSACION = os.environ.get("NOMBRE_ARCHIVO_CONVERSACION", "conversacion.json")
+# CORS_ORIGINS: específico de FastAPI/ASR (no confundir con CORS_ALLOWED_ORIGINS del Nginx Gateway)
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 
 # MODELOS DE DATOS
 class PeticionASR(BaseModel):
@@ -70,38 +77,69 @@ async def notificar_a_laravel(uuid: str, estado: str, resultado: dict = None, er
     elif estado == "FALLIDO" and error:
         payload["error"] = error
 
-    url = callback_url or f"{LARAVEL_URL}/api/ia/callback"
+    # Usar LARAVEL_URL para comunicación interna Docker
+    # El callback_url es la URL pública (para el frontend), no para comunicación entre servicios
+    url = f"{LARAVEL_URL}/api/ia/callback"
+    headers = {
+        "X-Callback-Secret": CALLBACK_SECRET,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+    max_intentos = 5
+    ultimo_error = None
+
+    for intento in range(1, max_intentos + 1):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    print(f"[{uuid}] Callback → {url} : {response.status} (intento {intento}/{max_intentos})", flush=True)
+                    if response.status == 200:
+                        return
+                    # 4xx/5xx: reintentar
+                    ultimo_error = Exception(f"HTTP {response.status}")
+        except Exception as e:
+            ultimo_error = e
+            print(f"[{uuid}] Callback error (intento {intento}/{max_intentos}): {e}", flush=True)
+
+        if intento < max_intentos:
+            delay = 2 ** (intento - 1)
+            await asyncio.sleep(delay)
+
+    print(f"[{uuid}] Callback fallido tras {max_intentos} intentos. Guardando en disco.", flush=True)
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {CALLBACK_SECRET}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                print(f"[{uuid}] Callback → {url} : {response.status}", flush=True)
-    except Exception as e:
-        print(f"[{uuid}] Error callback: {e}", flush=True)
+        os.makedirs("/tmp/minerva_failed_callbacks", exist_ok=True)
+        ruta_respaldo = f"/tmp/minerva_failed_callbacks/{uuid}.json"
+        datos = {
+            "uuid": uuid,
+            "estado": estado,
+            "payload": payload,
+            "callback_url": url,
+            "ultimo_error": str(ultimo_error) if ultimo_error else None,
+            "intentos": max_intentos,
+        }
+        with open(ruta_respaldo, "w") as f:
+            json.dump(datos, f)
+        print(f"[{uuid}] Resultado guardado en {ruta_respaldo}", flush=True)
+    except Exception as disk_err:
+        print(f"[{uuid}] Error al guardar respaldo en disco: {disk_err}", flush=True)
 
 
 async def actualizar_progreso_laravel(uuid: str, estado: str, progreso: int = None, etapa: str = None, callback_url: str = None):
     """Actualiza el progreso en Laravel via SSE update.
-    Deriva la URL base del callback_url (auto-adaptativo a cualquier entorno)."""
+    Usa LARAVEL_URL para comunicación interna Docker, no la URL pública del callback."""
     payload = {"uuid": uuid, "estado": estado}
     if progreso is not None:
         payload["progreso"] = progreso
     if etapa is not None:
         payload["etapa"] = etapa
 
-    if callback_url:
-        parsed = urlparse(callback_url)
-        base = f"{parsed.scheme}://{parsed.netloc}"
-    else:
-        base = LARAVEL_URL.rstrip('/')
+    base = LARAVEL_URL.rstrip('/')
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -109,7 +147,7 @@ async def actualizar_progreso_laravel(uuid: str, estado: str, progreso: int = No
                 f"{base}/api/ia/sse-update",
                 json=payload,
                 headers={
-                    "Authorization": f"Bearer {CALLBACK_SECRET}",
+                    "X-Callback-Secret": CALLBACK_SECRET,
                     "Content-Type": "application/json",
                     "Accept": "application/json"
                 },
@@ -272,6 +310,20 @@ app = FastAPI(
     description="Servicio principal de orquestacion para transcripcion (Qwen3-ASR) y diarizacion (Senko).",
     version="2.0-ES",
     lifespan=lifespan
+)
+
+origenes_raw = os.environ.get("CORS_ORIGINS", "*")
+if origenes_raw == "*":
+    origenes = ["*"]
+else:
+    origenes = [o.strip() for o in origenes_raw.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origenes,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

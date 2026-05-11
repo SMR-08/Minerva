@@ -12,10 +12,10 @@ class AdminAuthController extends Controller
     /**
      * Mostrar formulario de login.
      */
-    public function showLoginForm()
+    public function showLoginForm(Request $request)
     {
         // Si ya está autenticado y es admin, redirigir al dashboard
-        if (Auth::check() && Auth::user()->id_rol === 1) {
+        if (Auth::check() && $request->user()->id_rol === 1) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -47,7 +47,7 @@ class AdminAuthController extends Controller
             $request->session()->regenerate();
 
             // Verificar que sea admin
-            if (Auth::user()->id_rol !== 1) {
+            if ($request->user()->id_rol !== 1) {
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
@@ -58,7 +58,7 @@ class AdminAuthController extends Controller
             }
 
             // Actualizar último acceso
-            Auth::user()->update(['ultimo_acceso' => now()]);
+            $request->user()->update(['ultimo_acceso' => now()]);
 
             // Redirigir a la página intentada o al dashboard
             return redirect()->intended(route('admin.dashboard'));

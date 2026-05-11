@@ -21,7 +21,7 @@ services:
     environment:
       - FRONTEND_UPSTREAM=${FRONTEND_UPSTREAM:-http://minerva-frontend:80}
       - BACKEND_UPSTREAM=${BACKEND_UPSTREAM:-http://minerva-nginx:80}
-      - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN:-http://150.214.56.73:9122}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://150.214.56.73:9122}
     depends_on:
       minerva-frontend:
         condition: service_healthy
@@ -116,15 +116,16 @@ services:
       - SESSION_LIFETIME=${SESSION_LIFETIME:-120}
       - BROADCAST_CONNECTION=${BROADCAST_CONNECTION:-log}
       - FILESYSTEM_DISK=${FILESYSTEM_DISK:-local}
-      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
       - CACHE_STORE=${CACHE_STORE:-database}
-      - AI_BACKEND_URL=${AI_BACKEND_URL:-http://minerva-asr:8000}
-      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://minerva-asr:8000}
-      - AI_INPUT_PATH=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - AI_TIMEOUT=${AI_TIMEOUT:-300}
+      - REDIS_HOST=minerva-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=null
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
-      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
-      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
+      - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
+      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
+      - AI_TIMEOUT=${AI_TIMEOUT:-7200}
     networks:
       - minerva-network
     depends_on:
@@ -206,16 +207,21 @@ services:
       - DB_DATABASE=${DB_DATABASE:-minerva_production}
       - DB_USERNAME=${DB_USERNAME:-minerva_prod}
       - DB_PASSWORD=${DB_PASSWORD}
-      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
+      - REDIS_HOST=minerva-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=null
       - CACHE_STORE=${CACHE_STORE:-database}
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
-      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambia_esto_en_produccion}
-      - LARAVEL_URL=${LARAVEL_URL:-http://laravel-app:80}
+      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
       - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
       - AI_TIMEOUT=${AI_TIMEOUT:-7200}
-    command: php artisan queue:work --queue=process_audio --timeout=7200 --sleep=5 --max-jobs=100
+    command: php artisan queue:work redis --queue=process_audio,default --tries=3 --max-time=3600
     depends_on:
       minerva-db:
+        condition: service_healthy
+      minerva-redis:
         condition: service_healthy
       laravel-app:
         condition: service_healthy
@@ -286,7 +292,7 @@ services:
     restart: always
     shm_size: 4gb
     ports:
-      - "192.168.18.131:8000:8000"
+      - "${IA_ASR_PORT:-8002}:8000"
     volumes:
       - ./IA/main.py:/app/main.py:ro
       - ./IA/procesamiento.py:/app/procesamiento.py:ro
@@ -296,7 +302,9 @@ services:
       - ia_cache_hf:/root/.cache/huggingface
       - ia_cache_torch:/root/.cache/torch
     environment:
-      - MODELO_ASR=${MODELO_ASR:-Qwen/Qwen3-ASR-1.7B}
+      - GPU_MODE=${GPU_MODE:-compact}
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - MODELO_ASR=${MODELO_ASR:-Qwen/Qwen3-ASR-0.6B}
       - MODELO_ALIGNER=${MODELO_ALIGNER:-Qwen/Qwen3-ForcedAligner-0.6B}
       - DISPOSITIVO_ASR=${DISPOSITIVO_ASR:-cuda:0}
       - URL_DIARIZADOR=${URL_DIARIZADOR:-http://minerva-diarizador:8000}
@@ -305,7 +313,8 @@ services:
       - NOMBRE_ARCHIVO_TRANSCRIPCION=${NOMBRE_ARCHIVO_TRANSCRIPCION:-transcripcion.txt}
       - NOMBRE_ARCHIVO_CONVERSACION=${NOMBRE_ARCHIVO_CONVERSACION:-conversacion.json}
       - LARAVEL_URL=${LARAVEL_URL:-http://192.168.18.35:9122}
-      - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-minerva_callback_secret}
+      - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - RUTA_TEMPORAL=/tmp
     deploy:
       resources:
         limits:
@@ -386,6 +395,40 @@ services:
       retries: 3
       start_period: 60s
 
+  # ============================================================================
+  # REDIS - Broker de colas para Laravel
+  # ============================================================================
+  minerva-redis:
+    profiles: ["back"]
+    image: redis:7-alpine
+    container_name: minerva-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - minerva-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # ==============================================================================
 # REDES
 # ==============================================================================
@@ -407,3 +450,5 @@ volumes:
     name: minerva_ia_cache_hf_production
   ia_cache_torch:
     name: minerva_ia_cache_torch_production
+  redis_data:
+    name: minerva_redis_data_production
