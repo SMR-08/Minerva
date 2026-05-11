@@ -59,6 +59,9 @@ Frontend/.angular/
 *.log
 npm-debug.log*
 
+# --- Notas de servidor ---
+notas_server.txt
+
 # --- Playwright E2E ---
 e2e/node_modules/
 e2e/playwright-report/
