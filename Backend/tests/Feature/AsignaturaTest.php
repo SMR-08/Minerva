@@ -132,7 +132,7 @@ test('usuario no puede ver asignatura de otro usuario', function () {
 
     $response = $this->getJson("/api/asignaturas/{$asignatura->id_asignatura}", authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 test('ver asignatura inexistente retorna 404', function () {
@@ -180,7 +180,7 @@ test('usuario no puede actualizar asignatura de otro', function () {
         'nombre' => 'Hackeado',
     ], authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 // ==================== ELIMINAR ====================
@@ -198,7 +198,7 @@ test('usuario puede eliminar su asignatura', function () {
     $response->assertStatus(200)
         ->assertJson(['message' => 'Asignatura eliminada correctamente']);
 
-    $this->assertDatabaseMissing('asignaturas', [
+    $this->assertSoftDeleted('asignaturas', [
         'id_asignatura' => $asignatura->id_asignatura,
     ]);
 });
@@ -214,5 +214,5 @@ test('usuario no puede eliminar asignatura de otro', function () {
 
     $response = $this->deleteJson("/api/asignaturas/{$asignatura->id_asignatura}", [], authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });

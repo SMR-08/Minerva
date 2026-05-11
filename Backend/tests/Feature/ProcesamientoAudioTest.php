@@ -36,7 +36,7 @@ test('usuario puede subir un archivo de audio válido', function () {
         'idioma' => 'auto',
     ], authHeaders($usuario));
 
-    $response->assertStatus(200)
+    $response->assertStatus(202)
         ->assertJsonStructure(['uuid', 'estado', 'message']);
 
     $this->assertDatabaseHas('transcripciones', [
@@ -114,7 +114,7 @@ test('subir audio crea registro de transcripción', function () {
         'idioma' => 'auto',
     ], authHeaders($usuario));
 
-    $response->assertStatus(200);
+    $response->assertStatus(202);
 
     // Verify the transcription record was created
     $this->assertDatabaseHas('transcripciones', [
