@@ -2,112 +2,69 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Tema;
+use App\Http\Requests\StoreTemaRequest;
+use App\Http\Requests\UpdateTemaRequest;
+use App\Http\Resources\TemaResource;
 use App\Models\Asignatura;
+use App\Models\Tema;
+use App\Services\TemaService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class TemaController extends Controller
 {
-    /**
-     * Muestra un listado del recurso.
-     * GET /api/temas?asignatura_id=X
-     */
+    public function __construct(
+        private TemaService $temaService,
+    ) {}
+
     public function index(Request $peticion)
     {
         $peticion->validate([
             'asignatura_id' => 'required|exists:asignaturas,id_asignatura',
         ]);
 
-        // Verificar que la asignatura pertenece al usuario
-        $asignatura = Asignatura::where('id_asignatura', $peticion->asignatura_id)
-            ->where('id_usuario', Auth::user()->id_usuario)
-            ->firstOrFail();
+        $asignatura = Asignatura::findOrFail($peticion->asignatura_id);
+        $this->authorize('view', $asignatura);
 
-        $temas = Tema::where('id_asignatura', $asignatura->id_asignatura)
-            ->orderBy('orden', 'asc')
-            ->get();
-
-        return response()->json($temas);
+        return TemaResource::collection(
+            $this->temaService->listarPorAsignatura($asignatura)
+        );
     }
 
-    /**
-     * Almacena un recurso recién creado en el almacenamiento.
-     * POST /api/temas
-     */
-    public function store(Request $peticion)
+    public function store(StoreTemaRequest $peticion)
     {
         $peticion->validate([
             'id_asignatura' => 'required|exists:asignaturas,id_asignatura',
-            'nombre' => 'required|string|max:100',
-            'orden' => 'integer',
         ]);
 
-        // Verificar propiedad de la asignatura
-        $asignatura = Asignatura::where('id_asignatura', $peticion->id_asignatura)
-            ->where('id_usuario', Auth::user()->id_usuario)
-            ->firstOrFail();
+        $asignatura = Asignatura::findOrFail($peticion->id_asignatura);
+        $this->authorize('view', $asignatura);
 
-        $tema = Tema::create([
-            'id_asignatura' => $peticion->id_asignatura,
-            'nombre' => $peticion->nombre,
-            'orden' => $peticion->orden ?? 0,
-        ]);
+        $tema = $this->temaService->crear($peticion->validated(), $asignatura);
 
-        return response()->json($tema, 201);
+        return new TemaResource($tema);
     }
 
-    /**
-     * Muestra el recurso especificado.
-     * GET /api/temas/{id}
-     */
-    public function show(string $id)
+    public function show(Tema $tema)
     {
-        // Join para verificar que la asignatura del tema pertenece al usuario
-        $tema = Tema::where('id_tema', $id)
-            ->whereHas('asignatura', function ($consulta) {
-                $consulta->where('id_usuario', Auth::user()->id_usuario);
-            })
-            ->firstOrFail();
+        $this->authorize('view', $tema);
 
-        return response()->json($tema);
+        return new TemaResource($tema);
     }
 
-    /**
-     * Actualiza el recurso especificado en el almacenamiento.
-     * PUT /api/temas/{id}
-     */
-    public function update(Request $peticion, string $id)
+    public function update(UpdateTemaRequest $peticion, Tema $tema)
     {
-        $tema = Tema::where('id_tema', $id)
-            ->whereHas('asignatura', function ($consulta) {
-                $consulta->where('id_usuario', Auth::user()->id_usuario);
-            })
-            ->firstOrFail();
+        $this->authorize('update', $tema);
 
-        $peticion->validate([
-            'nombre' => 'string|max:100',
-            'orden' => 'integer',
-        ]);
+        $tema = $this->temaService->actualizar($tema, $peticion->validated());
 
-        $tema->update($peticion->only(['nombre', 'orden']));
-
-        return response()->json($tema);
+        return new TemaResource($tema);
     }
 
-    /**
-     * Elimina el recurso especificado del almacenamiento.
-     * DELETE /api/temas/{id}
-     */
-    public function destroy(string $id)
+    public function destroy(Tema $tema)
     {
-        $tema = Tema::where('id_tema', $id)
-            ->whereHas('asignatura', function ($consulta) {
-                $consulta->where('id_usuario', Auth::user()->id_usuario);
-            })
-            ->firstOrFail();
+        $this->authorize('delete', $tema);
 
-        $tema->delete();
+        $this->temaService->eliminar($tema);
 
         return response()->json(['message' => 'Tema eliminado correctamente']);
     }

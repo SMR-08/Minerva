@@ -7,6 +7,9 @@
 -include .env
 export
 
+# Modo GPU: compact (8GB VRAM, modelo 0.6B) | full (16GB+ VRAM, modelo 1.7B)
+GPU_MODE ?= compact
+
 # ==============================================================================
 # MODO
 # DEV=1 (por defecto) usa docker-compose.yml (desarrollo)
@@ -44,6 +47,7 @@ help: ## Mostrar esta ayuda
 	@echo "$(AZUL)╚══════════════════════════════════════════╝$(RESET)"
 	@echo ""
 	@echo "Modo actual: DEV=$(DEV) (compose: $(COMPOSE_FILE))"
+	@echo "Modo GPU:   GPU_MODE=$(GPU_MODE) (compact=8GB/0.6B, full=16GB+/1.7B)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(VERDE)%-20s$(RESET) %s\n", $$1, $$2}'
@@ -53,11 +57,14 @@ mode: ## Mostrar modo actual (DEV=1/0) y compose activo
 	@echo "DEV=$(DEV)"
 	@echo "COMPOSE_FILE=$(COMPOSE_FILE)"
 	@echo "DC=$(DC)"
+	@echo "GPU_MODE=$(GPU_MODE)"
 	@echo ""
 	@echo "Ejemplos:"
 	@echo "  make up"
 	@echo "  DEV=0 make back-up"
 	@echo "  DEV=0 make ia-up"
+	@echo "  GPU_MODE=full DEV=0 make ia-up   (GPU 16GB+)"
+	@echo "  GPU_MODE=compact DEV=0 make ia-up (GPU 8GB)"
 	@echo ""
 
 # ==============================================================================

@@ -12,7 +12,9 @@ class Usuario extends Authenticatable
 
     protected $table = 'usuarios';
     protected $primaryKey = 'id_usuario';
-    public $timestamps = false; // Manually managed in SQL for registration/access
+    // $timestamps = false porque la tabla usa 'fecha_registro' y 'ultimo_acceso'
+    // en vez de las columnas por defecto 'created_at' y 'updated_at'
+    public $timestamps = false;
 
     protected $fillable = [
         'id_rol', 

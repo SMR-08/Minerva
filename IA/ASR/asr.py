@@ -27,6 +27,7 @@ MAPA_IDIOMAS = {
     "sv": "Swedish", "fi": "Finnish", "el": "Greek", "cs": "Czech",
     "ro": "Romanian", "hu": "Hungarian", "fa": "Persian", "fil": "Filipino",
     "mk": "Macedonian", "yue": "Cantonese",
+    "ca": "Catalan", "eu": "Basque", "gl": "Galician",
 }
 
 

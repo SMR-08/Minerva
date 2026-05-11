@@ -3,24 +3,26 @@ header {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 2rem;
-    background-color: var(--color-tech-blue);
-    color: var(--color-text-white);
+    background-color: var(--card);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-body);
 }
 
 a {
     text-decoration: none;
-    color: var(--color-text-white);
+    color: var(--fg);
     transition: color 0.3s ease;
 }
 
 .active {
-    color: var(--color-active-link);
+    color: var(--primary);
     font-weight: bold;
 }
 
 .logo {
     font-size: 1.5rem;
     font-weight: bold;
+    font-family: var(--font-sans);
 }
 
 .nav-links {
@@ -32,13 +34,14 @@ a {
 .btn-logout {
     background: none;
     border: none;
-    color: var(--color-text-white);
+    color: var(--fg);
     font-size: 1rem;
     cursor: pointer;
     padding: 0;
     transition: color 0.3s ease;
+    font-family: var(--font-body);
 }
 
 .btn-logout:hover {
-    color: var(--color-active-link);
+    color: var(--primary);
 }

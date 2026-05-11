@@ -3,133 +3,94 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transcripcion;
-use App\Models\AudioProcessingJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class SseController extends Controller
 {
     /**
-     * Server-Sent Events para actualizaciones en tiempo real del procesamiento.
-     * GET /api/transcripciones/{uuid}/estado
+     * Estado de procesamiento de una transcripción (polling, no SSE).
+     * GET /api/transcripciones/{uuid}/estado?token=xxx
+     *
+     * Devuelve JSON inmediatamente. El frontend hace polling cada 2s.
+     * Esto evita bloquear workers PHP-FPM con while(true) como hacia
+     * el SSE anterior. Con 20 usuarios concurrentes, cada peticion
+     * libera el worker en <100ms en vez de ocuparlo 2 horas.
      */
     public function estado(Request $request, string $uuid)
     {
-        // Headers CORS y SSE deben ir antes de cualquier salida
-        header('Access-Control-Allow-Origin: ' . ($request->header('Origin') ?? '*'));
-        header('Access-Control-Allow-Methods: GET, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-        header('Content-Type: text/event-stream');
-        header('Cache-Control: no-cache');
-        header('X-Accel-Buffering: no');
-        header('Connection: keep-alive');
-        ini_set('output_buffering', 'off');
-        ini_set('zlib.output_compression', false);
-        ob_implicit_flush(true);
-
-        if ($request->isMethod('OPTIONS')) { return; }
-
-        // Autenticar via query param (EventSource no soporta headers)
-        $token = $request->query('token');
-        if (!$token || !PersonalAccessToken::findToken($token)) {
-            echo "data: " . json_encode(['error' => 'No autorizado']) . "\n\n";
-            if (ob_get_level()) ob_flush();
-            flush();
-            return;
-        }
-
-        // Buscar transcripción
-        $transcripcion = Transcripcion::where('uuid_referencia', $uuid)->first();
+        $transcripcion = Transcripcion::with('tema.asignatura')
+            ->where('uuid_referencia', $uuid)->first();
 
         if (!$transcripcion) {
-            echo "data: " . json_encode(['error' => 'No encontrado']) . "\n\n";
-            if (ob_get_level()) ob_flush();
-            flush();
-            return;
+            return response()->json(['error' => 'No encontrado'], 404);
         }
 
-        $startTime = time();
-        $timeout = config('audio.sse.timeout_seconds', 7200); // 2 horas
-        $heartbeatInterval = config('audio.sse.heartbeat_seconds', 30);
-        $lastHeartbeat = time();
+        $userId = $transcripcion->tema->asignatura->id_usuario;
 
-        // Loop SSE: mantener conexión abierta
-        while (true) {
-            // Recargar datos desde BD
-            $transcripcion->refresh();
+        $sseToken = $request->query('sse_token');
+        $sanctumToken = $request->query('token');
 
-            // Construir payload
-            $payload = [
-                'estado' => $transcripcion->estado,
-                'titulo' => $transcripcion->titulo,
-                'uuid' => $transcripcion->uuid_referencia,
-            ];
+        $autenticado = false;
 
-            // Agregar datos específicos según estado
-            switch ($transcripcion->estado) {
-                case 'SUBIENDO':
-                    $payload['mensaje'] = 'Subiendo archivo...';
-                    break;
-
-                case 'ENCOLADO':
-                    $payload['posicion'] = $this->obtenerPosicionCola($uuid);
-                    $payload['mensaje'] = "En cola, posición #{$payload['posicion']}";
-                    break;
-
-                case 'PROCESANDO':
-                    $payload['progreso'] = $transcripcion->progreso_porcentaje ?? 0;
-                    $payload['etapa'] = $transcripcion->etapa_actual ?? 'ASR';
-                    $payload['eta_segundos'] = $this->calcularETA($uuid);
-                    $payload['mensaje'] = $this->obtenerMensajeEtapa($payload['etapa']);
-                    break;
-
-                case 'COMPLETADO':
-                    $payload['url'] = url('/transcripcion/' . $transcripcion->id_transcripcion);
-                    $payload['mensaje'] = '¡Completado!';
-                    break;
-
-                case 'FALLIDO':
-                    $payload['error'] = $transcripcion->error_mensaje ?? 'Error desconocido';
-                    $payload['mensaje'] = 'Error al procesar';
-                    break;
-            }
-
-            // Enviar evento SSE
-            echo "data: " . json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n\n";
-            if (ob_get_level()) ob_flush();
-            flush();
-
-            // Salir si está completado o fallido
-            if (in_array($transcripcion->estado, ['COMPLETADO', 'FALLIDO'])) {
-                break;
-            }
-
-            // Heartbeat: enviar comentario vacío para mantener conexión viva
-            if (time() - $lastHeartbeat >= $heartbeatInterval) {
-                echo ": heartbeat\n\n";
-                if (ob_get_level()) ob_flush();
-                flush();
-                $lastHeartbeat = time();
-            }
-
-            // Esperar 2 segundos antes de siguiente actualización
-            usleep(2000000);
-
-            // Timeout después del máximo configurado
-            if (time() - $startTime > $timeout) {
-                echo "data: " . json_encode(['error' => 'Timeout de conexión']) . "\n\n";
-                if (ob_get_level()) ob_flush();
-                flush();
-                break;
-            }
-
-            // Verificar si cliente aún está conectado
-            if (connection_aborted()) {
-                break;
+        if ($sseToken) {
+            $cachedUserId = Cache::get("sse_token:{$sseToken}");
+            if ($cachedUserId && (int)$cachedUserId === $userId) {
+                Cache::forget("sse_token:{$sseToken}");
+                $autenticado = true;
             }
         }
+
+        if (!$autenticado && $sanctumToken) {
+            $accessToken = PersonalAccessToken::findToken($sanctumToken);
+            if ($accessToken && (int)$accessToken->tokenable_id === $userId) {
+                $autenticado = true;
+            }
+        }
+
+        if (!$autenticado) {
+            return response()->json(['error' => 'No autorizado'], 401);
+        }
+
+        // Construir payload (mismo formato que el SSE anterior)
+        $payload = [
+            'estado' => $transcripcion->estado,
+            'titulo' => $transcripcion->titulo,
+            'uuid' => $transcripcion->uuid_referencia,
+        ];
+
+        switch ($transcripcion->estado) {
+            case 'SUBIENDO':
+                $payload['mensaje'] = 'Subiendo archivo...';
+                break;
+
+            case 'ENCOLADO':
+                $payload['posicion'] = $this->obtenerPosicionCola($uuid);
+                $payload['mensaje'] = "En cola, posicion #{$payload['posicion']}";
+                break;
+
+            case 'PROCESANDO':
+                $payload['progreso'] = $transcripcion->progreso_porcentaje ?? 0;
+                $payload['etapa'] = $transcripcion->etapa_actual ?? 'ASR';
+                $payload['eta_segundos'] = $this->calcularETA($uuid);
+                $payload['mensaje'] = $this->obtenerMensajeEtapa($payload['etapa']);
+                break;
+
+            case 'COMPLETADO':
+                $payload['url'] = url('/transcripcion/' . $transcripcion->id_transcripcion);
+                $payload['mensaje'] = 'Completado!';
+                break;
+
+            case 'FALLIDO':
+                $payload['error'] = $transcripcion->error_mensaje ?? 'Error desconocido';
+                $payload['mensaje'] = 'Error al procesar';
+                break;
+        }
+
+        return response()->json($payload);
     }
 
     /**
@@ -196,16 +157,28 @@ class SseController extends Controller
     }
 
     /**
+     * Genera un token temporal de un solo uso para SSE.
+     * POST /api/sse/token
+     */
+    public function generarTokenSSE(Request $request)
+    {
+        $token = Str::uuid()->toString();
+        Cache::put("sse_token:{$token}", $request->user()->id_usuario, now()->addSeconds(30));
+
+        return response()->json(['token' => $token]);
+    }
+
+    /**
      * Endpoint para actualizaciones push desde IA (interno).
      * POST /api/ia/sse-update
      */
     public function sseUpdate(Request $request)
     {
-        // Validar secret
-        $secret = $request->header('Authorization', '');
-        $expectedSecret = 'Bearer ' . config('audio.ia.callback_secret');
+        // Validar secret (mismo header que procesarCallback para coherencia)
+        $secret = $request->header('X-Callback-Secret', '');
+        $expectedSecret = config('audio.ia.callback_secret');
 
-        if ($secret !== $expectedSecret) {
+        if (!hash_equals($secret, $expectedSecret)) {
             return response()->json(['error' => 'No autorizado'], 401);
         }
 

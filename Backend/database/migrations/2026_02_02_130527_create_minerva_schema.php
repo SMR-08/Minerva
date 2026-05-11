@@ -18,24 +18,11 @@ return new class extends Migration
             $table->string('descripcion', 255)->nullable();
         });
 
-        // Insert Default Roles
-        DB::table('roles')->insertOrIgnore([
-            ['id_rol' => 1, 'nombre' => 'ADMIN', 'descripcion' => 'Administrador del sistema'],
-            ['id_rol' => 2, 'nombre' => 'USUARIO', 'descripcion' => 'Usuario estándar'],
-        ]);
-
         // 2. Estados Usuario
         Schema::create('estados_usuario', function (Blueprint $table) {
             $table->id('id_estado');
             $table->string('nombre', 50)->unique();
         });
-
-        // Insert Default Estados
-        DB::table('estados_usuario')->insertOrIgnore([
-            ['id_estado' => 1, 'nombre' => 'ACTIVO'],
-            ['id_estado' => 2, 'nombre' => 'SUSPENDIDO'],
-            ['id_estado' => 3, 'nombre' => 'BANEADO'],
-        ]);
 
         // 3. Usuarios
         Schema::create('usuarios', function (Blueprint $table) {

@@ -35,6 +35,25 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Doble guard: web (sesiones) + sanctum (tokens API)
+    |--------------------------------------------------------------------------
+    |
+    | - 'web' (session): usado por el panel admin (Filament) y vistas Blade.
+    |   Autentica mediante cookies de sesión PHP. Las rutas web usan este guard.
+    |
+    | - 'sanctum': usado por la API REST consumida desde Angular.
+    |   Autentica mediante tokens Bearer (Personal Access Tokens).
+    |   El guard 'sanctum' se define en el service provider de Sanctum,
+    |   no aquí. Ver config/sanctum.php.
+    |
+    | IMPORTANTE: Son sistemas de autenticación independientes. Un logout
+    | de API (POST /api/logout) solo invalida el token actual, NO cierra
+    | la sesión web del panel admin. Para cerrar sesión web, usar la ruta
+    | de logout del panel admin (POST /admin/logout).
+    |
+    */
     'guards' => [
         'web' => [
             'driver' => 'session',

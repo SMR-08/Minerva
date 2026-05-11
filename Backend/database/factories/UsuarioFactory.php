@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Rol;
-use App\Models\Estado;
+use App\Models\EstadoUsuario;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 

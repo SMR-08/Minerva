@@ -2,97 +2,63 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreAsignaturaRequest;
+use App\Http\Requests\UpdateAsignaturaRequest;
+use App\Http\Resources\AsignaturaResource;
 use App\Models\Asignatura;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Services\AsignaturaService;
 
 class AsignaturaController extends Controller
 {
-    /**
-     * Muestra un listado del recurso.
-     * GET /api/asignaturas
-     */
-    public function index(Request $peticion)
-    {
-        // Usuarios solo ven sus asignaturas
-        // Admin ve todas? (Por ahora asumimos contexto de usuario)
-        $usuario = $peticion->user();
-        
-        $consulta = Asignatura::where('id_usuario', $usuario->id_usuario);
+    public function __construct(
+        private AsignaturaService $asignaturaService,
+    ) {}
 
-        return response()->json($consulta->get());
+    public function index()
+    {
+        $this->authorize('viewAny', Asignatura::class);
+
+        return AsignaturaResource::collection(
+            $this->asignaturaService->listarPorUsuario(request()->user())
+        );
     }
 
-    /**
-     * Almacena un recurso recién creado en el almacenamiento.
-     * POST /api/asignaturas
-     */
-    public function store(Request $peticion)
+    public function store(StoreAsignaturaRequest $peticion)
     {
-        $peticion->validate([
-            'nombre' => 'required|string|max:100',
-            'profesor' => 'nullable|string|max:100',
-            'descripcion' => 'nullable|string',
-            'color_hex' => 'nullable|string|size:7',
-        ]);
+        $this->authorize('create', Asignatura::class);
 
-        $asignatura = Asignatura::create([
-            'id_usuario' => $peticion->user()->id_usuario,
-            'nombre' => $peticion->nombre,
-            'profesor' => $peticion->profesor,
-            'descripcion' => $peticion->descripcion,
-            'color_hex' => $peticion->color_hex ?? '#3B82F6',
-        ]);
+        $asignatura = $this->asignaturaService->crear(
+            $peticion->validated(),
+            $peticion->user()
+        );
 
-        return response()->json($asignatura, 201);
+        return new AsignaturaResource($asignatura);
     }
 
-    /**
-     * Muestra el recurso especificado.
-     * GET /api/asignaturas/{id}
-     */
-    public function show(string $id)
+    public function show(Asignatura $asignatura)
     {
-        $asignatura = Asignatura::where('id_asignatura', $id)
-            ->where('id_usuario', Auth::user()->id_usuario)
-            ->firstOrFail();
+        $this->authorize('view', $asignatura);
 
-        return response()->json($asignatura);
+        return new AsignaturaResource($asignatura);
     }
 
-    /**
-     * Actualiza el recurso especificado en el almacenamiento.
-     * PUT /api/asignaturas/{id}
-     */
-    public function update(Request $peticion, string $id)
+    public function update(UpdateAsignaturaRequest $peticion, Asignatura $asignatura)
     {
-        $asignatura = Asignatura::where('id_asignatura', $id)
-            ->where('id_usuario', Auth::user()->id_usuario)
-            ->firstOrFail();
+        $this->authorize('update', $asignatura);
 
-        $peticion->validate([
-            'nombre' => 'string|max:100',
-            'profesor' => 'nullable|string|max:100',
-            'descripcion' => 'nullable|string',
-            'color_hex' => 'nullable|string|size:7',
-        ]);
+        $asignatura = $this->asignaturaService->actualizar(
+            $asignatura,
+            $peticion->validated()
+        );
 
-        $asignatura->update($peticion->only(['nombre', 'profesor', 'descripcion', 'color_hex']));
-
-        return response()->json($asignatura);
+        return new AsignaturaResource($asignatura);
     }
 
-    /**
-     * Elimina el recurso especificado del almacenamiento.
-     * DELETE /api/asignaturas/{id}
-     */
-    public function destroy(string $id)
+    public function destroy(Asignatura $asignatura)
     {
-        $asignatura = Asignatura::where('id_asignatura', $id)
-            ->where('id_usuario', Auth::user()->id_usuario)
-            ->firstOrFail();
+        $this->authorize('delete', $asignatura);
 
-        $asignatura->delete();
+        $this->asignaturaService->eliminar($asignatura);
 
         return response()->json(['message' => 'Asignatura eliminada correctamente']);
     }
