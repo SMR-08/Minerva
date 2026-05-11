@@ -1,7 +1,9 @@
-import { Component, signal, OnInit } from '@angular/core';
+import { Component, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { MinervaService, Transcripcion } from '../minerva.service';
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
@@ -20,7 +22,7 @@ interface Segmento {
   templateUrl: './transcripcion-view.component.html',
   styleUrl: './transcripcion-view.component.css'
 })
-export class TranscripcionViewComponent implements OnInit {
+export class TranscripcionViewComponent implements OnInit, OnDestroy {
   transcripcion = signal<Transcripcion | null>(null);
   segmentos = signal<Segmento[]>([]);
   userMenuOpen = false;
@@ -31,6 +33,8 @@ export class TranscripcionViewComponent implements OnInit {
   modalEditar = false;
   modalEliminar = false;
   tituloInput = '';
+
+  private destroy$ = new Subject<void>();
 
   constructor(
     private minervaService: MinervaService,
@@ -44,7 +48,7 @@ export class TranscripcionViewComponent implements OnInit {
     const id = parseInt(this.route.snapshot.paramMap.get('id') || '0', 10);
     if (!id) { this.router.navigate(['/dashboard']); return; }
 
-    this.minervaService.getTranscripciones().subscribe({
+    this.minervaService.getTranscripciones().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         const trans = data.find(t => t.id_transcripcion === id);
         if (trans) {
@@ -63,6 +67,11 @@ export class TranscripcionViewComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   abrirModalEditar(): void {
     this.tituloInput = this.transcripcion()?.titulo || '';
     this.modalEditar = true;
@@ -73,7 +82,7 @@ export class TranscripcionViewComponent implements OnInit {
     if (!trans || !this.tituloInput?.trim()) return;
     this.minervaService.actualizarTranscripcion(trans.id_transcripcion, {
       titulo: this.tituloInput.trim()
-    }).subscribe({
+    }).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.modalEditar = false;
         this.transcripcion.set(res);
@@ -90,7 +99,7 @@ export class TranscripcionViewComponent implements OnInit {
   eliminarTranscripcion(): void {
     const trans = this.transcripcion();
     if (!trans) return;
-    this.minervaService.eliminarTranscripcion(trans.id_transcripcion).subscribe({
+    this.minervaService.eliminarTranscripcion(trans.id_transcripcion).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalEliminar = false;
         this.notifService.success('Transcripción eliminada');

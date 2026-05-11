@@ -127,9 +127,18 @@
 
 <!-- Modales fuera del stacking context de dashboard-page -->
 <app-modal [show]="modalCrear" titulo="Nueva Asignatura" size="sm" (cerrar)="modalCrear = false">
-  <div>
-    <label style="display:block;margin-bottom:6px;font-family:'Cinzel',serif;font-size:0.8rem;font-weight:600;color:#1a1a1a;">Nombre</label>
-    <input type="text" [(ngModel)]="nombreInput" placeholder="Ej: Matemáticas" class="modal-input" (keyup.enter)="crearAsignatura()">
+  <div class="modal-form">
+    <div class="modal-field">
+      <label>Nombre</label>
+      <input type="text" [(ngModel)]="nombreInput" placeholder="Ej: Matemáticas" class="modal-input" (keyup.enter)="crearAsignatura()">
+    </div>
+    <div class="modal-field">
+      <label>Color</label>
+      <div class="color-picker-row">
+        <input type="color" [(ngModel)]="colorInput" class="modal-color">
+        <span class="color-hex">{{ colorInput }}</span>
+      </div>
+    </div>
   </div>
   <div modal-actions>
     <button class="btn-modal-secondary" (click)="modalCrear = false">Cancelar</button>
