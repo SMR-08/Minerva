@@ -2,9 +2,11 @@ import { Component, OnInit, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { MinervaService, Asignatura, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
-import { SseService, SseEvent } from '../sse.service';
+import { SseService, SseEvent, PollingHandler } from '../sse.service';
 import { NotificationService } from '../notification.service';
 
 @Component({
@@ -39,7 +41,8 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
   transcripcionUrl = signal<string>('');
   mensajeError = signal<string>('');
 
-  private eventSource: EventSource | null = null;
+  private pollingHandler: PollingHandler | null = null;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private minervaService: MinervaService,
@@ -51,24 +54,23 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnDestroy(): void {
-    this.eventSource?.close();
+    this.pollingHandler?.detener();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   ngOnInit(): void {
     this.cargarDatos();
 
-    // Check for temaId query param
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
       if (params['temaId']) {
         const temaId = parseInt(params['temaId'], 10);
-        // Find the tema and its asignatura
-        this.minervaService.getAsignaturas().subscribe({
+        this.minervaService.getAsignaturas().pipe(takeUntil(this.destroy$)).subscribe({
           next: (asignaturas) => {
             this.asignaturas.set(asignaturas);
-            // Load all temas to find the one
             let loaded = 0;
             asignaturas.forEach(asig => {
-              this.minervaService.getTemas(asig.id_asignatura).subscribe({
+              this.minervaService.getTemas(asig.id_asignatura).pipe(takeUntil(this.destroy$)).subscribe({
                 next: (temas) => {
                   const found = temas.find(t => t.id_tema === temaId);
                   if (found) {
@@ -89,7 +91,7 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
   }
 
   cargarDatos(): void {
-    this.minervaService.getAsignaturas().subscribe({
+    this.minervaService.getAsignaturas().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => this.asignaturas.set(data),
       error: (err) => console.error('Error cargando asignaturas', err)
     });
@@ -100,7 +102,7 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
     this.temasFiltrados.set([]);
 
     if (this.formulario.id_asignatura) {
-      this.minervaService.getTemas(this.formulario.id_asignatura).subscribe({
+      this.minervaService.getTemas(this.formulario.id_asignatura).pipe(takeUntil(this.destroy$)).subscribe({
         next: (data) => this.temasFiltrados.set(data),
         error: (err) => console.error('Error cargando temas', err)
       });
@@ -137,10 +139,10 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
 
     const formData = new FormData();
     formData.append('audio', this.archivoSeleccionado);
-    formData.append('nombre', this.formulario.nombre);
+    formData.append('titulo', this.formulario.nombre);
     formData.append('idioma', 'auto');
 
-    this.minervaService.subirAudio(formData, this.formulario.id_tema).subscribe({
+    this.minervaService.subirAudio(formData, this.formulario.id_tema).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         const idAsig = this.formulario.id_asignatura;
         this.notifService.success('Audio subido. Se procesará en segundo plano.');
@@ -162,10 +164,10 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
     });
   }
 
-  conectarSSE(uuid: string): void {
-    this.eventSource?.close();
+  async conectarSSE(uuid: string): Promise<void> {
+    this.pollingHandler?.detener();
     const token = this.authService.getUser()?.token || '';
-    this.eventSource = this.sseService.conectar(
+    this.pollingHandler = await this.sseService.conectar(
       uuid,
       token,
       (event: SseEvent) => this.manejarEventoSSE(event),

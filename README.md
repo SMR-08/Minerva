@@ -50,7 +50,7 @@ Minerva usa una arquitectura donde el archivo de audio **nunca se almacena perma
 - ✅ **Proxy streaming**: Laravel recibe y reenvía el audio a IA sin guardarlo
 - ✅ **Archivo efímero**: Solo existe en `/tmp` de IA durante el procesamiento
 - ✅ **Limpieza automática**: El archivo se elimina después de procesar
-- ✅ **SSE**: Actualizaciones en tiempo real vía Server-Sent Events
+- ✅ **Polling**: Actualizaciones cada 2 segundos vía HTTP
 - ✅ **Colas**: Múltiples peticiones se encolan y procesan secuencialmente
 
 ### Estados del Procesamiento
@@ -363,6 +363,7 @@ Guía completa: `docs/DEPLOYMENT.md`.
 | **Backend (Laravel API)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/api` |
 | **Panel Admin (Laravel)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/admin` |
 | **Base de Datos (MariaDB)** | `3307` | `3306` | `minerva-db` | `localhost:3307` |
+| **Redis** | `6379` | `6379` | `minerva-redis` | `localhost:6379` |
 | **IA - ASR** | `8002` | `8000` | `minerva-asr` | `http://localhost:8002` |
 | **IA - Diarizador** | — | `8000` | `minerva-diarizador` | Solo interno |
 
@@ -397,7 +398,7 @@ Base URL: `http://localhost:8001/api`
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| `POST` | `/transcripciones/upload` | Subir archivo de audio para transcribir |
+| `POST` | `/api/temas/{id}/procesar-audio` | Subir archivo de audio para transcribir |
 | `GET` | `/transcripciones` | Listar transcripciones del usuario |
 | `GET` | `/transcripciones/{id}` | Detalle completo de una transcripción |
 | `DELETE` | `/transcripciones/{id}` | Eliminar transcripción |

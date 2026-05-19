@@ -56,7 +56,7 @@ test('usuario no puede listar temas de asignatura ajena', function () {
 
     $response = $this->getJson("/api/temas?asignatura_id={$asignatura->id_asignatura}", authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 // ==================== CREAR ====================
@@ -130,7 +130,7 @@ test('usuario no puede crear tema en asignatura ajena', function () {
         'nombre' => 'Tema intruso',
     ], authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 // ==================== VER ====================
@@ -165,7 +165,7 @@ test('usuario no puede ver tema de asignatura ajena', function () {
 
     $response = $this->getJson("/api/temas/{$tema->id_tema}", authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 // ==================== ACTUALIZAR ====================
@@ -204,7 +204,7 @@ test('usuario no puede actualizar tema de asignatura ajena', function () {
         'nombre' => 'Hackeado',
     ], authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });
 
 // ==================== ELIMINAR ====================
@@ -224,7 +224,7 @@ test('usuario puede eliminar un tema propio', function () {
     $response->assertStatus(200)
         ->assertJson(['message' => 'Tema eliminado correctamente']);
 
-    $this->assertDatabaseMissing('temas', [
+    $this->assertSoftDeleted('temas', [
         'id_tema' => $tema->id_tema,
     ]);
 });
@@ -243,5 +243,5 @@ test('usuario no puede eliminar tema de asignatura ajena', function () {
 
     $response = $this->deleteJson("/api/temas/{$tema->id_tema}", [], authHeaders($usuario2));
 
-    $response->assertStatus(404);
+    $response->assertStatus(403);
 });

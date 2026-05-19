@@ -74,53 +74,47 @@ class AdminDashboardController extends Controller
     }
 
     /**
-     * Subir audio y enviarlo al microservicio de IA.
+     * Subir audio usando el mismo flujo que la API normal:
+     * store → Transcripcion → AudioProcessingJob → Redis → Worker → IA.
      */
     public function uploadAudio(Request $request)
     {
         $request->validate([
-            'audio' => 'required|file|mimes:mp3,wav,m4a,flac,ogg|max:51200', // máximo 50MB
+            'audio' => 'required|file|mimes:mp3,wav,m4a,flac,ogg,webm,aac|max:51200',
         ]);
 
         try {
-            $audio = $request->file('audio');
-            $inputPath = trim(config('audio.ia.input_path', '/app/compartido/entrada'), '"\'');
-            $absolutePath = str_starts_with($inputPath, '/') ? $inputPath : base_path($inputPath);
+            $file = $request->file('audio');
+            $uuid = (string) \Illuminate\Support\Str::uuid();
+            $path = $file->store('uploads');
 
-            $fileName = time() . '_' . $audio->getClientOriginalName();
-            $audio->move($absolutePath, $fileName);
-
-            $urlIA = config('audio.ia.upload_url');
-            $respuesta = Http::timeout(config('audio.ia.timeout', 120))
-                ->post("$urlIA/transcribir_diarizado", [
-                    'nombre_archivo' => $fileName,
-                ]);
-
-            if ($respuesta->successful()) {
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Audio subido y enviado a procesar.',
-                    'data' => $respuesta->json()
-                ]);
-            }
-
-            Log::error("La IA respondió con error", [
-                'status' => $respuesta->status(),
-                'body' => $respuesta->body(),
+            // Crear transcripción para el admin (sin tema/asignatura, solo debug)
+            $transcripcion = \App\Models\Transcripcion::create([
+                'uuid_referencia' => $uuid,
+                'titulo' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+                'estado' => 'ENCOLADO',
+                'nombre_archivo_original' => $file->getClientOriginalName(),
+                'duracion_segundos' => 0,
+                'progreso_porcentaje' => 0,
+                'id_tema' => 1, // tema por defecto para debug
             ]);
+
+            \App\Jobs\AudioProcessingJob::dispatch($transcripcion, $path, 'auto')
+                ->onQueue('process_audio');
+
             return response()->json([
-                'status' => 'error_interno',
-                'message' => 'Error interno al conectar con el servicio de IA'
-            ], 502);
+                'status' => 'success',
+                'message' => 'Audio encolado en Redis. Worker procesará.',
+                'uuid' => $uuid,
+            ]);
 
         } catch (\Exception $e) {
-            Log::error("Error al procesar subida de audio", [
+            Log::error("Error en uploadAudio admin", [
                 'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error interno del servidor'
+                'message' => 'Error interno del servidor',
             ], 500);
         }
     }

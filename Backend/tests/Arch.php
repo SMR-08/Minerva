@@ -36,8 +36,7 @@ arch('seeders are in Database\Seeders')
 // Factories are in Database\Factories
 arch('factories are in Database\Factories')
     ->expect('Database\Factories')
-    ->toBeClasses()
-    ->ignoring('Database\Factories\UserFactory');
+    ->toBeClasses();
 
 // No direct env() calls in application code (use config instead)
 arch('no env calls in controllers')

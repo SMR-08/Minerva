@@ -1,7 +1,9 @@
-import { Component, signal, OnInit, HostListener } from '@angular/core';
+import { Component, signal, OnInit, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { MinervaService, Asignatura, Transcripcion, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
@@ -14,7 +16,7 @@ import { ModalComponent } from '../modal/modal.component';
   templateUrl: './asignatura-view.component.html',
   styleUrl: './asignatura-view.component.css'
 })
-export class AsignaturaViewComponent implements OnInit {
+export class AsignaturaViewComponent implements OnInit, OnDestroy {
   asignatura = signal<Asignatura | null>(null);
   temas = signal<Tema[]>([]);
   transcripciones = signal<Transcripcion[]>([]);
@@ -34,6 +36,8 @@ export class AsignaturaViewComponent implements OnInit {
   transEditando: Transcripcion | null = null;
   transTituloInput = '';
 
+  private destroy$ = new Subject<void>();
+
   constructor(
     private minervaService: MinervaService,
     private authService: AuthService,
@@ -46,15 +50,15 @@ export class AsignaturaViewComponent implements OnInit {
     const id = parseInt(this.route.snapshot.paramMap.get('id') || '0', 10);
     if (!id) { this.router.navigate(['/dashboard']); return; }
 
-    this.minervaService.getAsignaturas().subscribe({
+    this.minervaService.getAsignaturas().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         const asig = data.find(a => a.id_asignatura === id);
         if (!asig) { this.router.navigate(['/dashboard']); return; }
         this.asignatura.set(asig);
-        this.minervaService.getTemas(id).subscribe({
+        this.minervaService.getTemas(id).pipe(takeUntil(this.destroy$)).subscribe({
           next: (temas) => {
             this.temas.set(temas);
-            this.minervaService.getTranscripciones().subscribe({
+            this.minervaService.getTranscripciones().pipe(takeUntil(this.destroy$)).subscribe({
               next: (trans) => this.transcripciones.set(trans)
             });
           }
@@ -63,8 +67,13 @@ export class AsignaturaViewComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   transcripcionesPorTema(temaId: number): Transcripcion[] {
-    return this.transcripciones().filter(t => t.id_tema === temaId);
+    return this.transcripciones().filter(t => (t.tema?.id_tema) === temaId);
   }
 
   totalTranscripciones(): number {
@@ -107,7 +116,7 @@ export class AsignaturaViewComponent implements OnInit {
   crearTema(): void {
     const asig = this.asignatura();
     if (!asig || !this.temaInput?.trim()) return;
-    this.minervaService.crearTema(asig.id_asignatura, this.temaInput.trim()).subscribe({
+    this.minervaService.crearTema(asig.id_asignatura, this.temaInput.trim()).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalCrearTema = false;
         this.recargarTemas();
@@ -129,7 +138,7 @@ export class AsignaturaViewComponent implements OnInit {
     if (!this.temaEditando || !this.temaInput?.trim()) return;
     this.minervaService.actualizarTema(this.temaEditando.id_tema, {
       nombre: this.temaInput.trim()
-    }).subscribe({
+    }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalEditarTema = false;
         this.temaEditando = null;
@@ -149,7 +158,7 @@ export class AsignaturaViewComponent implements OnInit {
 
   eliminarTema(): void {
     if (!this.temaEditando) return;
-    this.minervaService.eliminarTema(this.temaEditando.id_tema).subscribe({
+    this.minervaService.eliminarTema(this.temaEditando.id_tema).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalEliminarTema = false;
         this.temaEditando = null;
@@ -172,7 +181,7 @@ export class AsignaturaViewComponent implements OnInit {
     if (!this.transEditando || !this.transTituloInput?.trim()) return;
     this.minervaService.actualizarTranscripcion(this.transEditando.id_transcripcion, {
       titulo: this.transTituloInput.trim()
-    }).subscribe({
+    }).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res) => {
         this.modalEditarTrans = false;
         this.transEditando = null;
@@ -195,7 +204,7 @@ export class AsignaturaViewComponent implements OnInit {
 
   eliminarTranscripcion(): void {
     if (!this.transEditando) return;
-    this.minervaService.eliminarTranscripcion(this.transEditando.id_transcripcion).subscribe({
+    this.minervaService.eliminarTranscripcion(this.transEditando.id_transcripcion).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalEliminarTrans = false;
         const id = this.transEditando!.id_transcripcion;
@@ -210,7 +219,7 @@ export class AsignaturaViewComponent implements OnInit {
   private recargarTemas(): void {
     const asig = this.asignatura();
     if (!asig) return;
-    this.minervaService.getTemas(asig.id_asignatura).subscribe({
+    this.minervaService.getTemas(asig.id_asignatura).pipe(takeUntil(this.destroy$)).subscribe({
       next: (temas) => this.temas.set(temas)
     });
   }

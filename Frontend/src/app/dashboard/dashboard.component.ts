@@ -1,7 +1,9 @@
-import { Component, signal, OnInit, computed, HostListener } from '@angular/core';
+import { Component, signal, OnInit, computed, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { MinervaService, Asignatura, Transcripcion, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
@@ -20,7 +22,7 @@ interface AsignaturaExtended extends Asignatura {
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   asignaturas = signal<AsignaturaExtended[]>([]);
   transcripciones = signal<Transcripcion[]>([]);
   searchQuery = '';
@@ -35,6 +37,8 @@ export class DashboardComponent implements OnInit {
   profesorInput = '';
   descripcionInput = '';
   colorInput = '#4A6B8A';
+
+  private destroy$ = new Subject<void>();
 
   actividades = computed(() => {
     return this.transcripciones()
@@ -62,8 +66,13 @@ export class DashboardComponent implements OnInit {
     this.cargarDatos();
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   cargarDatos(): void {
-    this.minervaService.getAsignaturas().subscribe({
+    this.minervaService.getAsignaturas().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         const extended = data.map(a => ({
           ...a,
@@ -75,7 +84,7 @@ export class DashboardComponent implements OnInit {
 
         let loaded = 0;
         extended.forEach(a => {
-          this.minervaService.getTemas(a.id_asignatura).subscribe({
+          this.minervaService.getTemas(a.id_asignatura).pipe(takeUntil(this.destroy$)).subscribe({
             next: (temas) => {
               const current = this.asignaturas();
               this.asignaturas.set(current.map(asig => {
@@ -96,7 +105,7 @@ export class DashboardComponent implements OnInit {
       error: (err) => console.error('Error dashboard asignaturas', err)
     });
 
-    this.minervaService.getTranscripciones().subscribe({
+    this.minervaService.getTranscripciones().pipe(takeUntil(this.destroy$)).subscribe({
       next: (data) => {
         this.transcripciones.set(data);
         setTimeout(() => this._updateTranscriptionCounts(), 500);
@@ -147,13 +156,14 @@ export class DashboardComponent implements OnInit {
 
   abrirModalCrear(): void {
     this.nombreInput = '';
+    this.colorInput = '#4A6B8A';
     this.modalCrear = true;
     this.cerrarMenu();
   }
 
   crearAsignatura(): void {
     if (!this.nombreInput?.trim()) return;
-    this.minervaService.crearAsignatura(this.nombreInput.trim()).subscribe({
+    this.minervaService.crearAsignatura(this.nombreInput.trim(), this.colorInput).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalCrear = false;
         this.cargarDatos();
@@ -184,7 +194,7 @@ export class DashboardComponent implements OnInit {
       profesor: this.profesorInput.trim() || undefined,
       descripcion: this.descripcionInput.trim() || undefined,
       color_hex: this.colorInput,
-    }).subscribe({
+    }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalEditar = false;
         this.asignaturaEditando = null;
@@ -207,7 +217,7 @@ export class DashboardComponent implements OnInit {
 
   eliminarAsignatura(): void {
     if (!this.asignaturaEditando) return;
-    this.minervaService.eliminarAsignatura(this.asignaturaEditando.id_asignatura).subscribe({
+    this.minervaService.eliminarAsignatura(this.asignaturaEditando.id_asignatura).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.modalConfirmar = false;
         this.asignaturaEditando = null;
