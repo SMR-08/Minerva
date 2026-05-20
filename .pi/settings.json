@@ -1,0 +1,39 @@
+{
+	"subagents": {
+		"agentOverrides": {
+			"sdd-explore": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"sdd-spec": {
+				"model": "deepseek/deepseek-v4-pro"
+			},
+			"sdd-design": {
+				"model": "deepseek/deepseek-v4-pro"
+			},
+			"sdd-apply": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"sdd-verify": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"sdd-sync": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"sdd-archive": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"researcher": {
+				"model": "deepseek/deepseek-v4-pro"
+			},
+			"reviewer": {
+				"model": "deepseek/deepseek-v4-pro"
+			},
+			"scout": {
+				"model": "deepseek/deepseek-v4-flash"
+			},
+			"worker": {
+				"model": "deepseek/deepseek-v4-flash"
+			}
+		}
+	}
+}
