@@ -72,8 +72,8 @@ mode: ## Mostrar modo actual (DEV=1/0) y compose activo
 # ==============================================================================
 
 init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
-	@echo "$(AZUL)═══ 🚀 Inicializando Minerva... ═══$(RESET)"
-	@if [ "$(DEV)" = "0" ]; then \
+	@echo "$(AZUL)═══ 🚀 Inicializando Minerva... ═══$(RESET)"; \
+	if [ "$(DEV)" = "0" ]; then \
 		echo "$(AMARILLO)Modo producción (DEV=0): asegúrate de haber copiado .env.production.example -> .env$(RESET)"; \
 		if [ ! -f .env ]; then \
 			echo "$(ROJO)❌ ERROR: No existe archivo .env$(RESET)"; \
@@ -87,7 +87,7 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 		if grep -E "cambiar_por_secret|cambia_esto" .env 2>/dev/null; then \
 			echo "$(AMARILLO)⚠️  ADVERTENCIA: IA_CALLBACK_SECRET contiene valor por defecto.$(RESET)"; \
 			echo "$(AMARILLO)   Genera uno seguro: openssl rand -base64 32$(RESET)"; \
-		fi; \
+		fi \
 	else \
 		if [ ! -f .env ]; then \
 			echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
@@ -102,50 +102,34 @@ init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
 		if grep -q "root_secret" .env 2>/dev/null; then \
 			echo "$(AMARILLO)⚠️  ADVERTENCIA: DB_ROOT_PASSWORD contiene valor por defecto ($(shell grep 'DB_ROOT_PASSWORD' .env | head -1)).$(RESET)"; \
 			echo "$(AMARILLO)   Cambialo antes de desplegar en produccion.$(RESET)"; \
-		fi;
-	@# 2. Verificar y generar APP_KEY si está vacía
-	@if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
-		echo "$(AMARILLO)🔑 Generando APP_KEY...$(RESET)"; \
+		fi \
+	fi
+	@echo "$(AMARILLO)🔑 Verificando/generando APP_KEY...$(RESET)"; \
+	if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
 		NEW_KEY="base64:$$(openssl rand -base64 32)"; \
 		sed -i "s|^APP_KEY=.*|APP_KEY=$$NEW_KEY|" .env; \
 		echo "$(VERDE)✓ APP_KEY generada en .env raíz.$(RESET)"; \
 	else \
 		echo "$(VERDE)✓ APP_KEY ya configurada.$(RESET)"; \
 	fi
-	@# 3. Generar .env de Laravel desde el .env global
 	@$(MAKE) generar-env-laravel
-	@# 4. Crear carpetas compartidas
 	@mkdir -p Shared/entrada Shared/salida
 	@echo "$(VERDE)✓ Carpetas compartidas creadas.$(RESET)"
-	@# 5. Construir imágenes
-	@echo "$(AMARILLO)🐳 Construyendo imágenes Docker...$(RESET)"
-	$(DC) build
-	@# 6. Levantar servicios
-	@echo "$(AMARILLO)🐳 Levantando servicios...$(RESET)"
-	$(DC) up -d
-	@# 7. Instalar dependencias de Composer
-	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"
-	$(DC) exec -T laravel-app composer install --no-interaction
-	@# 8. Instalar dependencias de npm y compilar assets (solo DEV)
+	@echo "$(AMARILLO)🐳 Construyendo imágenes Docker...$(RESET)"; $(DC) build
+	@echo "$(AMARILLO)🐳 Levantando servicios...$(RESET)"; $(DC) up -d
+	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"; $(DC) exec -T laravel-app composer install --no-interaction
 	@if [ "$(DEV)" != "0" ]; then \
-		echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"; \
-		$(MAKE) build-assets; \
+		echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"; $(MAKE) build-assets; \
 	fi
-	@# 9. Permisos de storage
 	@$(MAKE) permisos
-	@# 10. Ejecutar migraciones y seeders
-	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"
-	$(DC) exec -T laravel-app php artisan migrate --force --seed
+	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"; $(DC) exec -T laravel-app php artisan migrate --force --seed
 	@if [ "$(DEV)" = "0" ]; then \
 		echo "$(AMARILLO)⚡ Optimizando Laravel (cache config/rutas/vistas)...$(RESET)"; \
 		$(DC) exec -T laravel-app php artisan config:cache; \
 		$(DC) exec -T laravel-app php artisan route:cache; \
 		$(DC) exec -T laravel-app php artisan view:cache; \
 	fi
-	@# 11. Iniciar workers de procesamiento
-	@echo "$(AMARILLO)👷 Iniciando workers de procesamiento...$(RESET)"
-	$(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker
-	@echo "$(VERDE)✓ Workers iniciados.$(RESET)"
+	@echo "$(AMARILLO)👷 Iniciando workers de procesamiento...$(RESET)"; $(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker
 	@echo ""
 	@echo "$(VERDE)═══ ✅ Minerva inicializada correctamente ═══$(RESET)"
 	@echo "$(VERDE)  Frontend:  http://localhost:$${FRONTEND_PORT:-4200}$(RESET)"
