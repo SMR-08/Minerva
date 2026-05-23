@@ -5,6 +5,7 @@ use App\Models\Tema;
 use App\Models\Usuario;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Config;
 
 /*
@@ -21,10 +22,9 @@ use Illuminate\Support\Facades\Config;
 // ==================== SUBIDA DE AUDIO ====================
 
 test('usuario puede subir un archivo de audio válido', function () {
-    // Mock the IA service to avoid real HTTP calls
-    Http::fake([
-        '*' => Http::response(['estado' => 'ENCOLADO'], 200),
-    ]);
+    // Fakeamos la cola para verificar dispatch sin ejecutar el job
+    Queue::fake();
+    Http::fake();
 
     $usuario = Usuario::factory()->create();
     $tema = createTemaPara($usuario);
@@ -43,6 +43,8 @@ test('usuario puede subir un archivo de audio válido', function () {
         'id_tema' => $tema->id_tema,
         'estado' => 'ENCOLADO',
     ]);
+
+    Queue::assertPushedOn('process_audio', \App\Jobs\AudioProcessingJob::class);
 });
 
 test('subir audio requiere archivo', function () {
@@ -100,9 +102,8 @@ test('usuario no puede subir audio a tema de asignatura ajena', function () {
 });
 
 test('subir audio crea registro de transcripción', function () {
-    Http::fake([
-        '*' => Http::response(['estado' => 'ENCOLADO'], 200),
-    ]);
+    Queue::fake();
+    Http::fake();
 
     $usuario = Usuario::factory()->create();
     $tema = createTemaPara($usuario);
@@ -116,12 +117,10 @@ test('subir audio crea registro de transcripción', function () {
 
     $response->assertStatus(202);
 
-    // Verify the transcription record was created
-    $this->assertDatabaseHas('transcripciones', [
-        'id_tema' => $tema->id_tema,
-    ]);
-
-    // The record should have a UUID reference
+    // Verificar que se creó el registro con los datos correctos
     $transcripcion = \App\Models\Transcripcion::where('id_tema', $tema->id_tema)->first();
+    expect($transcripcion)->not()->toBeNull();
     expect($transcripcion->uuid_referencia)->not()->toBeNull();
+    expect($transcripcion->nombre_archivo_original)->toBe('clase.mp3');
+    expect($transcripcion->estado)->toBe('ENCOLADO');
 });

@@ -14,17 +14,31 @@ setup('authenticate as user', async ({ page }) => {
   await page.locator('#email').fill(email);
   await page.locator('#contrasena').fill(password);
   await page.locator('#contrasenaConfirm').fill(password);
-  await page.getByRole('button', { name: 'REGISTRARSE' }).click();
 
-  await page.waitForURL('**/login', { timeout: 15000 });
+  // Interceptar la respuesta de la API para confirmar que el registro fue exitoso
+  const registroResponse = page.waitForResponse(
+    (res) => res.url().includes('/api/register') && res.status() === 201
+  );
+  await page.getByRole('button', { name: 'REGISTRARSE' }).click();
+  await registroResponse;
+
+  // Esperar redireccion a login (el componente usa setTimeout 1500ms)
+  await page.waitForURL('**/login', { timeout: 10000 });
 
   // Login
   await page.locator('#email').fill(email);
   await page.locator('#contrasena').fill(password);
+
+  // Interceptar respuesta de login
+  const loginResponse = page.waitForResponse(
+    (res) => res.url().includes('/api/login') && res.status() === 200
+  );
   await page.getByRole('button', { name: 'INICIAR SESIÓN' }).click();
+  await loginResponse;
 
-  await page.waitForURL('**/dashboard', { timeout: 15000 });
-  await expect(page.locator('.user-avatar')).toBeVisible();
+  // Esperar redireccion al dashboard
+  await page.waitForURL('**/dashboard', { timeout: 10000 });
 
+  // Guardar estado de autenticacion para los demas tests
   await page.context().storageState({ path: authFile });
 });
