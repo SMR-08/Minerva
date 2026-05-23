@@ -11,7 +11,6 @@ export class RegistroPage {
 
   constructor(page: Page) {
     this.page = page;
-    // Usar id directamente — los labels no tienen atributo "for" en el HTML actual
     this.inputNombre = page.locator('#nombre');
     this.inputEmail = page.locator('#email');
     this.inputContrasena = page.locator('#contrasena');
@@ -24,12 +23,20 @@ export class RegistroPage {
     await this.page.goto('/registro');
   }
 
-  async registrar(nombre: string, email: string, password: string) {
+  /**
+   * Rellena el formulario y hace click en registrarse.
+   * Si waitRedirect=true, espera la redireccion a /login.
+   */
+  async registrar(nombre: string, email: string, password: string, waitRedirect = false) {
     await this.inputNombre.fill(nombre);
     await this.inputEmail.fill(email);
     await this.inputContrasena.fill(password);
     await this.inputContrasenaConfirm.fill(password);
     await this.btnRegistrarse.click();
+
+    if (waitRedirect) {
+      await this.page.waitForURL('**/login', { timeout: 20000 });
+    }
   }
 
   async expectDisabled() {

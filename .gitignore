@@ -67,5 +67,8 @@ e2e/node_modules/
 e2e/playwright-report/
 e2e/test-results/
 e2e/playwright/.auth/
-# Local Pi runtime state
-.atl/
+
+#Miscelaneo
+.env.backup_prod
+.tmp-audit/
+context.md

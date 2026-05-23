@@ -1,0 +1,85 @@
+# ==============================================================================
+# Minerva — OpenSpec Project Configuration
+# ==============================================================================
+
+project:
+  name: Minerva
+  slug: minerva
+  description: >
+    Plataforma de transcripción y organización de apuntes para estudiantes.
+    Graba clases → transcribe con IA (ASR + diarización) → organiza temarios
+    → genera resúmenes → construye comprensión progresiva de asignaturas.
+  type: tfg  # Trabajo de Fin de Grado — 2º DAW
+  phase: prototype  # Prototipo funcional con core duro
+
+# --- Stack tecnológico ---
+stack:
+  backend:
+    framework: Laravel 11
+    language: PHP 8.3
+    pattern: MVC + Services + FormRequests + Resources + Policies
+    queue: Redis (queue:work)
+    auth: Sanctum (token-based SPA)
+    db: MariaDB
+    testing: Pest
+  frontend:
+    framework: Angular 17
+    language: TypeScript
+    pattern: Standalone components + Services
+    state: Services con BehaviorSubject
+  ia:
+    framework: FastAPI (Python)
+    asr: Qwen3-ASR (0.6B/1.7B)
+    diarization: Senko (pyannote VAD)
+    gpu: NVIDIA (CUDA)
+  infra:
+    containers: Docker Compose (dev) / Docker Compose + Nginx Gateway (prod)
+    orchestration: Makefile (DEV=1/0)
+    deployment_target: AWS (Terraform — horizontal + vertical)
+    ci: GitHub Actions (pendiente)
+
+# --- Requisitos mínimos del TFG ---
+requirements:
+  mandatory:
+    - Laravel MVC 100% con APIs REST
+    - Angular (frontend SPA)
+    - Despliegue con Terraform en AWS (horizontal + vertical)
+  core_features:
+    - Transcripción automática de audio (ASR + diarización)
+    - Organización por Asignatura > Tema > Transcripción
+    - Resumen automático por clase (pendiente)
+    - Autenticación y autorización (roles)
+    - Panel admin básico
+  stretch_goals:
+    - Comprensión progresiva de temarios (Big Data de transcripciones)
+    - Generación de apuntes estructurados
+    - Búsqueda semántica en transcripciones
+
+# --- Testing ---
+testing:
+  backend:
+    runner: pest
+    command: docker compose -f docker-compose.yml exec -T laravel-app ./vendor/bin/pest
+    strict_tdd: false  # Activar cuando estabilicemos el core
+  e2e:
+    runner: playwright
+    command: cd e2e && npx playwright test --reporter=list
+    status: unstable  # Suele fallar, no bloquea
+
+# --- SDD Session Config ---
+sdd:
+  execution_mode: interactive
+  artifact_store: openspec
+  chained_pr_strategy: ask-always
+  review_budget_lines: 300
+
+# --- Preferencias del autor ---
+preferences:
+  no_emojis: true  # No usar emojis en CLI, Makefile, outputs
+  rewrite_acceptable: true  # Reescrituras aceptables si mejoran arquitectura
+  thin_services_decision:
+    TranscripcionService: enrich  # Mover ETA, cola, scopeDelUsuario aqui
+    AsignaturaService: remove  # CRUD puro, Policies protegen
+    TemaService: remove  # CRUD puro, Policies protegen
+  laravel_refactor: openspec/laravel-refactor.md  # Plan detallado
+  queue_unified: pending  # Cola unica con concurrencia ajustable (post-TFG)

@@ -10,8 +10,8 @@ use App\Http\Controllers\TagController;
 use App\Http\Controllers\SseController;
 
 // Rutas públicas
-Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:30,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:30,1');
 
 // Callbacks de IA (autenticados con secret propio, no con Sanctum)
 Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback')->middleware('throttle:30,1');
