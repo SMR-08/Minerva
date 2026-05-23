@@ -1,0 +1,107 @@
+# ==============================================================================
+# Build & Push — Construye imagenes Docker y las sube a GitHub Container Registry
+# ==============================================================================
+# Trigger: push a main (despues de que tests pasen)
+# Resultado: imagenes en ghcr.io/smr-08/minerva-* listas para pull
+# ==============================================================================
+
+name: Construir y Publicar Imagenes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - 'Frontend/**'
+      - 'IA/**'
+      - 'nginx-gateway/**'
+      - 'docker-compose.production.yml'
+      - '.github/workflows/build-push.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/minerva
+
+jobs:
+  build-and-push:
+    name: Construir y Publicar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Autenticarse en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Metadatos Docker (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-backend
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Metadatos Docker (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-frontend
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - name: Metadatos Docker (gateway)
+        id: meta-gateway
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-gateway
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      # --- Construir y Publicar: Backend ---
+      - name: Construir y publicar Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Backend
+          file: ./Backend/Dockerfile.production
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Construir y Publicar: Frontend ---
+      - name: Construir y publicar Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Frontend
+          file: ./Frontend/Dockerfile.production
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Construir y Publicar: Gateway ---
+      - name: Construir y publicar Gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: ./nginx-gateway
+          file: ./nginx-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.meta-gateway.outputs.tags }}
+          labels: ${{ steps.meta-gateway.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
