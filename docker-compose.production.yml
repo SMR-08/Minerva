@@ -126,6 +126,8 @@ services:
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
       - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
       - AI_TIMEOUT=${AI_TIMEOUT:-7200}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:9122}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:9122,localhost}
     networks:
       - minerva-network
     depends_on:
@@ -217,6 +219,8 @@ services:
       - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
       - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
       - AI_TIMEOUT=${AI_TIMEOUT:-7200}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:9122}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:9122,localhost}
     command: php artisan queue:work redis --queue=process_audio,default --tries=3 --max-time=3600
     depends_on:
       minerva-db:

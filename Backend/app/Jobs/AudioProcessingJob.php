@@ -70,6 +70,10 @@ class AudioProcessingJob implements ShouldQueue
 
             $stream = Storage::readStream($this->rutaArchivo);
 
+            if (!is_resource($stream)) {
+                throw new \Exception('No se pudo abrir stream del archivo: ' . $this->rutaArchivo);
+            }
+
             $response = Http::timeout($timeout)
                 ->withHeaders(['X-Callback-Secret' => config('audio.ia.callback_secret')])
                 ->attach(
@@ -77,11 +81,10 @@ class AudioProcessingJob implements ShouldQueue
                     $stream,
                     $uuid . '.' . pathinfo($this->rutaArchivo, PATHINFO_EXTENSION)
                 )
-                ->asMultipart()
                 ->post("{$urlIA}/upload", [
-                    ['name' => 'uuid', 'contents' => $uuid],
-                    ['name' => 'idioma', 'contents' => $this->idioma],
-                    ['name' => 'callback_url', 'contents' => $callbackUrl],
+                    'uuid' => $uuid,
+                    'idioma' => $this->idioma,
+                    'callback_url' => $callbackUrl,
                 ]);
 
             if (is_resource($stream)) {
