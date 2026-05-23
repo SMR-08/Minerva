@@ -72,3 +72,8 @@ e2e/playwright/.auth/
 .env.backup_prod
 .tmp-audit/
 context.md
+# Local Pi runtime state
+.atl/
+
+# OpenSpec (artefactos internos de planificacion)
+openspec/

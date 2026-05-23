@@ -92,18 +92,28 @@ init: ## Inicialización completa (DEV=1 desarrollo | DEV=0 producción)
 	@# --- Build ---
 	@echo "$(AMARILLO)Construyendo imágenes...$(RESET)"
 	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile front --profile back --profile ia build; \
+		PROFILES="--profile front --profile back"; \
+		if ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+			PROFILES="$$PROFILES --profile ia"; \
+		fi; \
+		$(DC) $$PROFILES build; \
 	else \
 		$(DC) build; \
 	fi
 	@# --- Limpiar contenedores huérfanos ---
 	@docker ps -a --format '{{.Names}}' | grep minerva | xargs -r docker rm -f 2>/dev/null || true
-	@# --- Up ---
+	@# --- Up (sin worker, necesita migraciones primero) ---
 	@echo "$(AMARILLO)Levantando servicios...$(RESET)"
 	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile front --profile back --profile ia up -d; \
+		PROFILES="--profile front --profile back"; \
+		if ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+			PROFILES="$$PROFILES --profile ia"; \
+		else \
+			echo "$(AMARILLO)[INFO] Sin GPU: servicios de IA omitidos.$(RESET)"; \
+		fi; \
+		$(DC) $$PROFILES up -d --scale laravel-worker=0; \
 	else \
-		$(DC) up -d; \
+		$(DC) up -d --scale laravel-worker=0; \
 	fi
 	@# --- Esperar DB + Laravel ---
 	@echo "$(AMARILLO)Esperando servicios...$(RESET)"
@@ -113,6 +123,10 @@ init: ## Inicialización completa (DEV=1 desarrollo | DEV=0 producción)
 	@for i in $$(seq 1 20); do \
 		$(DC) exec -T laravel-app php -r "echo 'ready';" 2>/dev/null && break || sleep 3; \
 	done
+	@# --- Inyectar .env en contenedor (volumen Docker no lo tiene) ---
+	@if [ "$(DEV)" = "0" ]; then \
+		docker cp Backend/.env minerva-app:/var/www/.env 2>/dev/null || true; \
+	fi
 	@# --- Composer (solo DEV) ---
 	@if [ "$(DEV)" != "0" ]; then \
 		echo "$(AMARILLO)Instalando dependencias PHP...$(RESET)"; \
@@ -132,9 +146,13 @@ init: ## Inicialización completa (DEV=1 desarrollo | DEV=0 producción)
 		$(DC) exec -T laravel-app php artisan route:cache; \
 		$(DC) exec -T laravel-app php artisan view:cache; \
 	fi
-	@# --- Workers ---
+	@# --- Workers (despues de migraciones) ---
 	@echo "$(AMARILLO)Iniciando workers...$(RESET)"
-	@if [ "$(DEV)" != "0" ]; then \
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile back up -d laravel-worker; \
+		sleep 3; \
+		docker cp Backend/.env minerva-worker:/var/www/.env 2>/dev/null || true; \
+	else \
 		$(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker 2>/dev/null || true; \
 	fi
 	@# --- Resumen ---

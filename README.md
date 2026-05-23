@@ -75,7 +75,7 @@ El audio nunca se queda en un filesystem compartido. Se transmite directamente:
 | Contenedores | Docker Compose | — | Orquestación de 8 servicios |
 | Gateway (prod) | Nginx | alpine | Reverse proxy + rate limiting |
 | CI/CD | GitHub Actions | — | Tests automáticos en PR |
-| IaC | Terraform + AWS | pendiente | Requisito TFG |
+| IaC | Terraform + AWS | implementado | ALB + ASG |
 
 ---
 
@@ -169,6 +169,47 @@ Variables críticas para modo distribuido:
 DEV=0 make check-env   # Valida configuración
 DEV=0 make health      # Verifica conectividad
 ```
+
+### AWS con Terraform
+
+Infraestructura como codigo en `terraform/`.
+
+**Dependencias**: `aws-cli` v2, `terraform` >= 1.5
+
+**Configurar credenciales del Lab** (expiran cada ~4h):
+
+1. Ir a AWS Academy > Learner Lab > Start Lab
+2. Click en "AWS Details" > Show (junto a "AWS CLI")
+3. Copiar el bloque en `~/.aws/credentials`:
+
+```ini
+[default]
+aws_access_key_id=ASIA...
+aws_secret_access_key=...
+aws_session_token=... (linea larga)
+```
+
+4. Verificar: `aws sts get-caller-identity`
+
+**Desplegar**:
+
+```bash
+cd terraform/
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
+```
+
+**Destruir** (cuando no se use, ahorra budget):
+
+```bash
+terraform destroy
+```
+
+Escalado:
+- **Horizontal**: Auto Scaling Group (min=1, max=3, escala por CPU > 70%)
+- **Vertical**: Cambiar `instance_type` en `terraform.tfvars` y `terraform apply`
 
 ---
 
@@ -398,7 +439,7 @@ Combina pyannote VAD con clustering de embeddings. Funciona sin necesidad de sab
 | Feature | Prioridad | Notas |
 |---------|-----------|-------|
 | Resumidor de clase | Alta | Columna `resumen_ia` existe en BD, falta lógica |
-| Terraform AWS | Alta | Requisito obligatorio TFG |
+| Terraform AWS | Alta | Implementado en `terraform/`. Falta probar con creds reales del Lab |
 | Sistema de Logging + Debug | Alta | JSON estructurado Loki-ready + debug granular por módulo. Ver `openspec/logging-debug-systems.md` |
 | Refactor MVC Laravel | Media | 2 fat controllers, enum EstadoTranscripcion, query scopes, 6 FormRequests. Ver `openspec/laravel-refactor.md` |
 | Cola unificada con concurrencia | Baja | Cola única que orqueste N workers = N audios simultáneos. Requiere reescribir IA (eliminar asyncio.Lock) y worker. Ajustable: 1=actual, N=servidor capaz. Reescritura aceptable. |
