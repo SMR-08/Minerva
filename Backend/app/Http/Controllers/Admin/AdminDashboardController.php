@@ -88,7 +88,17 @@ class AdminDashboardController extends Controller
             $uuid = (string) \Illuminate\Support\Str::uuid();
             $path = $file->store('uploads');
 
-            // Crear transcripción para el admin (sin tema/asignatura, solo debug)
+            // Obtener o crear asignatura+tema de debug para el admin
+            $admin = $request->user();
+            $asignatura = \App\Models\Asignatura::firstOrCreate(
+                ['id_usuario' => $admin->id_usuario, 'nombre' => 'Admin Debug'],
+                ['profesor' => 'Sistema', 'color_hex' => '#6B7280']
+            );
+            $tema = \App\Models\Tema::firstOrCreate(
+                ['id_asignatura' => $asignatura->id_asignatura, 'nombre' => 'Uploads Debug'],
+                ['orden' => 1]
+            );
+
             $transcripcion = \App\Models\Transcripcion::create([
                 'uuid_referencia' => $uuid,
                 'titulo' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
@@ -96,7 +106,7 @@ class AdminDashboardController extends Controller
                 'nombre_archivo_original' => $file->getClientOriginalName(),
                 'duracion_segundos' => 0,
                 'progreso_porcentaje' => 0,
-                'id_tema' => 1, // tema por defecto para debug
+                'id_tema' => $tema->id_tema,
             ]);
 
             \App\Jobs\AudioProcessingJob::dispatch($transcripcion, $path, 'auto')

@@ -1,166 +1,182 @@
 # ==============================================================================
-# Minerva - Makefile de Automatización
-# Uso: make <comando>
+# Minerva - Makefile Orquestador
 # ==============================================================================
-
-# Cargar variables del .env global (si existe)
+# Uso: make <comando>
+# Modo: DEV=1 (desarrollo) | DEV=0 (producción)
+# ==============================================================================
 -include .env
 export
-
-# Modo GPU: compact (8GB VRAM, modelo 0.6B) | full (16GB+ VRAM, modelo 1.7B)
 GPU_MODE ?= compact
-
-# ==============================================================================
-# MODO
-# DEV=1 (por defecto) usa docker-compose.yml (desarrollo)
-# DEV=0 usa docker-compose.production.yml (producción)
-# ==============================================================================
 DEV ?= 1
-
 ifeq ($(DEV),0)
 COMPOSE_FILE := docker-compose.production.yml
 else
 COMPOSE_FILE := docker-compose.yml
 endif
-
 DC := docker compose -f $(COMPOSE_FILE)
-
-# Ruta absoluta al directorio del proyecto
 PROJECT_ROOT := $(shell pwd)
-
-.PHONY: help mode init up down restart build logs status \
-        front-up front-down front-logs back-up back-down back-logs ia-up ia-down ia-logs \
-        migrate seed shell-backend shell-frontend shell-db \
-        clean permisos generar-env-laravel build-assets
-
-# --- Colores ---
 AZUL     := $(shell printf '\033[1;34m')
 VERDE    := $(shell printf '\033[1;32m')
 AMARILLO := $(shell printf '\033[1;33m')
 ROJO     := $(shell printf '\033[1;31m')
 RESET    := $(shell printf '\033[0m')
+.PHONY: help mode init up down restart build logs status check-env health \
+        front-up front-down front-logs back-up back-down back-logs ia-up ia-down ia-logs \
+        migrate seed migrate-fresh permisos generar-env-laravel build-assets \
+        shell-backend shell-frontend shell-db \
+        cola-estado cola-limpiar scale-workers worker-logs sse-logs \
+        clean test test-backend test-e2e
 
+# ==============================================================================
+# AYUDA
+# ==============================================================================
 help: ## Mostrar esta ayuda
 	@echo ""
 	@echo "$(AZUL)╔══════════════════════════════════════════╗$(RESET)"
-	@echo "$(AZUL)║     🦉 Minerva - Comandos Disponibles    ║$(RESET)"
+	@echo "$(AZUL)║      Minerva - Comandos Disponibles      ║$(RESET)"
 	@echo "$(AZUL)╚══════════════════════════════════════════╝$(RESET)"
 	@echo ""
-	@echo "Modo actual: DEV=$(DEV) (compose: $(COMPOSE_FILE))"
-	@echo "Modo GPU:   GPU_MODE=$(GPU_MODE) (compact=8GB/0.6B, full=16GB+/1.7B)"
+	@echo "Modo: DEV=$(DEV) | Compose: $(COMPOSE_FILE) | GPU: $(GPU_MODE)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(VERDE)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 
-mode: ## Mostrar modo actual (DEV=1/0) y compose activo
-	@echo "DEV=$(DEV)"
-	@echo "COMPOSE_FILE=$(COMPOSE_FILE)"
-	@echo "DC=$(DC)"
-	@echo "GPU_MODE=$(GPU_MODE)"
+mode: ## Mostrar modo actual y ejemplos de uso
+	@echo "DEV=$(DEV) | COMPOSE_FILE=$(COMPOSE_FILE) | GPU_MODE=$(GPU_MODE)"
 	@echo ""
-	@echo "Ejemplos:"
-	@echo "  make up"
-	@echo "  DEV=0 make back-up"
-	@echo "  DEV=0 make ia-up"
-	@echo "  GPU_MODE=full DEV=0 make ia-up   (GPU 16GB+)"
-	@echo "  GPU_MODE=compact DEV=0 make ia-up (GPU 8GB)"
-	@echo ""
+	@echo "Uso:"
+	@echo "  make init              Desarrollo completo"
+	@echo "  make health            Verificar conectividad"
+	@echo "  DEV=0 make init        Producción monolítica"
+	@echo "  DEV=0 make back-up     Solo backend (prod)"
+	@echo "  DEV=0 make ia-up       Solo IA (prod)"
 
 # ==============================================================================
-# INICIALIZACIÓN COMPLETA
+# INICIALIZACIÓN
 # ==============================================================================
-
-init: ## 🚀 Inicialización completa (DEV=1) o producción esencial (DEV=0)
-	@echo "$(AZUL)═══ 🚀 Inicializando Minerva... ═══$(RESET)"
-	@if [ "$(DEV)" = "0" ]; then \
-		echo "$(AMARILLO)Modo producción (DEV=0): asegúrate de haber copiado .env.production.example -> .env$(RESET)"; \
-		if [ ! -f .env ]; then \
-			echo "$(ROJO)❌ ERROR: No existe archivo .env$(RESET)"; \
-			echo "$(AMARILLO)  cp .env.production.example .env$(RESET)"; \
+init: ## Inicialización completa (DEV=1 desarrollo | DEV=0 producción)
+	@echo "$(AZUL)Inicializando Minerva [DEV=$(DEV)]$(RESET)"
+	@# --- .env ---
+	@if [ ! -f .env ]; then \
+		if [ "$(DEV)" = "0" ]; then \
+			echo "$(ROJO)[ERROR] No existe .env. Ejecuta:$(RESET)"; \
+			echo "  cp .env.production.example .env && nano .env"; \
 			exit 1; \
-		fi; \
-		if grep -q "CAMBIAR_CONTRASEÑA_SEGURA_AQUI" .env 2>/dev/null; then \
-			echo "$(ROJO)❌ ERROR: Debes cambiar DB_PASSWORD/DB_ROOT_PASSWORD en .env$(RESET)"; \
-			exit 1; \
-		fi; \
-		if grep -E "cambiar_por_secret|cambia_esto" .env 2>/dev/null; then \
-			echo "$(AMARILLO)⚠️  ADVERTENCIA: IA_CALLBACK_SECRET contiene valor por defecto.$(RESET)"; \
-			echo "$(AMARILLO)   Genera uno seguro: openssl rand -base64 32$(RESET)"; \
-		fi; \
-	else \
-		if [ ! -f .env ]; then \
-			echo "$(AMARILLO)📄 Creando .env desde .env.example...$(RESET)"; \
-			cp .env.example .env; \
 		else \
-			echo "$(VERDE)✓ .env ya existe.$(RESET)"; \
+			echo "$(AMARILLO)[WARN] Creando .env desde .env.example...$(RESET)"; \
+			cp .env.example .env; \
 		fi; \
-		if grep -E "cambiar_por_secret|cambia_esto" .env 2>/dev/null; then \
-			echo "$(AMARILLO)⚠️  ADVERTENCIA: IA_CALLBACK_SECRET contiene valor por defecto.$(RESET)"; \
-			echo "$(AMARILLO)   Genera uno seguro: openssl rand -base64 32$(RESET)"; \
+	fi
+	@$(MAKE) --no-print-directory check-env
+	@# --- GPU check ---
+	@if ! ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+		echo "$(AMARILLO)[WARN] nvidia-persistenced no activo. Intentando activar...$(RESET)"; \
+		systemctl start nvidia-persistenced 2>/dev/null || true; \
+		sleep 1; \
+		if ! ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+			echo "$(ROJO)[ERROR] GPU no disponible. Los servicios de IA no arrancarán.$(RESET)"; \
+			echo "$(ROJO)[ERROR] Ejecuta: sudo systemctl start nvidia-persistenced$(RESET)"; \
+			echo "$(AMARILLO)[WARN] Continuando sin IA...$(RESET)"; \
 		fi; \
-		if grep -q "root_secret" .env 2>/dev/null; then \
-			echo "$(AMARILLO)⚠️  ADVERTENCIA: DB_ROOT_PASSWORD contiene valor por defecto ($(shell grep 'DB_ROOT_PASSWORD' .env | head -1)).$(RESET)"; \
-			echo "$(AMARILLO)   Cambialo antes de desplegar en produccion.$(RESET)"; \
-		fi;
-	@# 2. Verificar y generar APP_KEY si está vacía
-	@if ! grep -q '^APP_KEY=base64:' .env 2>/dev/null || [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
-		echo "$(AMARILLO)🔑 Generando APP_KEY...$(RESET)"; \
-		NEW_KEY="base64:$$(openssl rand -base64 32)"; \
-		sed -i "s|^APP_KEY=.*|APP_KEY=$$NEW_KEY|" .env; \
-		echo "$(VERDE)✓ APP_KEY generada en .env raíz.$(RESET)"; \
-	else \
-		echo "$(VERDE)✓ APP_KEY ya configurada.$(RESET)"; \
 	fi
-	@# 3. Generar .env de Laravel desde el .env global
-	@$(MAKE) generar-env-laravel
-	@# 4. Crear carpetas compartidas
-	@mkdir -p Shared/entrada Shared/salida
-	@echo "$(VERDE)✓ Carpetas compartidas creadas.$(RESET)"
-	@# 5. Construir imágenes
-	@echo "$(AMARILLO)🐳 Construyendo imágenes Docker...$(RESET)"
-	$(DC) build
-	@# 6. Levantar servicios
-	@echo "$(AMARILLO)🐳 Levantando servicios...$(RESET)"
-	$(DC) up -d
-	@# 7. Instalar dependencias de Composer
-	@echo "$(AMARILLO)📦 Instalando dependencias PHP (Composer)...$(RESET)"
-	$(DC) exec -T laravel-app composer install --no-interaction
-	@# 8. Instalar dependencias de npm y compilar assets (solo DEV)
-	@if [ "$(DEV)" != "0" ]; then \
-		echo "$(AMARILLO)📦 Instalando dependencias npm...$(RESET)"; \
-		$(MAKE) build-assets; \
+	@# --- APP_KEY ---
+	@if [ -z "$$(grep '^APP_KEY=' .env | cut -d'=' -f2)" ]; then \
+		echo "$(AMARILLO)Generando APP_KEY...$(RESET)"; \
+		KEY=$$(openssl rand -base64 32); \
+		sed -i "s|^APP_KEY=.*|APP_KEY=base64:$$KEY|" .env; \
+		echo "$(VERDE)[OK] APP_KEY generada.$(RESET)"; \
 	fi
-	@# 9. Permisos de storage
-	@$(MAKE) permisos
-	@# 10. Ejecutar migraciones y seeders
-	@echo "$(AMARILLO)🗄️ Ejecutando migraciones y seeders...$(RESET)"
-	$(DC) exec -T laravel-app php artisan migrate --force --seed
+	@# --- Backend/.env ---
+	@$(MAKE) --no-print-directory generar-env-laravel
+	@# --- Build ---
+	@echo "$(AMARILLO)Construyendo imágenes...$(RESET)"
 	@if [ "$(DEV)" = "0" ]; then \
-		echo "$(AMARILLO)⚡ Optimizando Laravel (cache config/rutas/vistas)...$(RESET)"; \
+		PROFILES="--profile front --profile back"; \
+		if ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+			PROFILES="$$PROFILES --profile ia"; \
+		fi; \
+		$(DC) $$PROFILES build; \
+	else \
+		$(DC) build; \
+	fi
+	@# --- Limpiar contenedores huérfanos ---
+	@docker ps -a --format '{{.Names}}' | grep minerva | xargs -r docker rm -f 2>/dev/null || true
+	@# --- Up (sin worker, necesita migraciones primero) ---
+	@echo "$(AMARILLO)Levantando servicios...$(RESET)"
+	@if [ "$(DEV)" = "0" ]; then \
+		PROFILES="--profile front --profile back"; \
+		if ls /run/nvidia-persistenced/socket >/dev/null 2>&1; then \
+			PROFILES="$$PROFILES --profile ia"; \
+		else \
+			echo "$(AMARILLO)[INFO] Sin GPU: servicios de IA omitidos.$(RESET)"; \
+		fi; \
+		$(DC) $$PROFILES up -d --scale laravel-worker=0; \
+	else \
+		$(DC) up -d --scale laravel-worker=0; \
+	fi
+	@# --- Esperar DB + Laravel ---
+	@echo "$(AMARILLO)Esperando servicios...$(RESET)"
+	@for i in $$(seq 1 15); do \
+		$(DC) exec -T minerva-db healthcheck.sh --connect 2>/dev/null && break || sleep 2; \
+	done
+	@for i in $$(seq 1 20); do \
+		$(DC) exec -T laravel-app php -r "echo 'ready';" 2>/dev/null && break || sleep 3; \
+	done
+	@# --- Inyectar .env en contenedor (volumen Docker no lo tiene) ---
+	@if [ "$(DEV)" = "0" ]; then \
+		docker cp Backend/.env minerva-app:/var/www/.env 2>/dev/null || true; \
+	fi
+	@# --- Composer (solo DEV) ---
+	@if [ "$(DEV)" != "0" ]; then \
+		echo "$(AMARILLO)Instalando dependencias PHP...$(RESET)"; \
+		$(DC) exec -T laravel-app composer install --no-interaction 2>/dev/null; \
+	fi
+	@# --- Permisos ---
+	@$(MAKE) --no-print-directory permisos
+	@# --- Migraciones + Seed ---
+	@echo "$(AMARILLO)Migraciones...$(RESET)"
+	@$(DC) exec -T laravel-app php artisan migrate --force
+	@echo "$(AMARILLO)Datos iniciales...$(RESET)"
+	@$(DC) exec -T laravel-app php artisan db:seed --force 2>/dev/null || true
+	@# --- Optimizar (solo PROD) ---
+	@if [ "$(DEV)" = "0" ]; then \
+		echo "$(AMARILLO)Optimizando Laravel...$(RESET)"; \
 		$(DC) exec -T laravel-app php artisan config:cache; \
 		$(DC) exec -T laravel-app php artisan route:cache; \
 		$(DC) exec -T laravel-app php artisan view:cache; \
 	fi
-	@# 11. Iniciar workers de procesamiento
-	@echo "$(AMARILLO)👷 Iniciando workers de procesamiento...$(RESET)"
-	$(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker
-	@echo "$(VERDE)✓ Workers iniciados.$(RESET)"
+	@# --- Workers (despues de migraciones) ---
+	@echo "$(AMARILLO)Iniciando workers...$(RESET)"
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile back up -d laravel-worker; \
+		sleep 3; \
+		docker cp Backend/.env minerva-worker:/var/www/.env 2>/dev/null || true; \
+	else \
+		$(DC) up -d --scale laravel-worker=$${WORKER_REPLICAS:-1} laravel-worker 2>/dev/null || true; \
+	fi
+	@# --- Resumen ---
 	@echo ""
-	@echo "$(VERDE)═══ ✅ Minerva inicializada correctamente ═══$(RESET)"
-	@echo "$(VERDE)  Frontend:  http://localhost:$${FRONTEND_PORT:-4200}$(RESET)"
-	@echo "$(VERDE)  Backend:   http://localhost:$${LARAVEL_PORT:-8001}$(RESET)"
-	@echo "$(VERDE)  IA (ASR):  http://localhost:$${IA_ASR_PORT:-8002}$(RESET)"
-	@echo "$(VERDE)  Base Datos: localhost:$${DB_EXTERNAL_PORT:-3307}$(RESET)"
+	@echo "$(VERDE)[OK] Minerva lista$(RESET)"
+	@if [ "$(DEV)" != "0" ]; then \
+		echo "  Frontend:  http://localhost:$${FRONTEND_PORT:-4200}"; \
+		echo "  Backend:   http://localhost:$${LARAVEL_PORT:-8001}"; \
+		echo "  IA (ASR):  http://localhost:$${IA_ASR_PORT:-8002}"; \
+	else \
+		echo "  Gateway: $$(grep '^APP_URL=' .env | cut -d'=' -f2-):$${GATEWAY_PORT:-9122}"; \
+	fi
 	@echo ""
-	@echo "$(AMARILLO)  Para ver el estado de la cola: make cola-estado$(RESET)"
-	@echo "$(AMARILLO)  Para escalar workers: make scale-workers N=3$(RESET)"
+	@echo "$(AMARILLO)Siguiente: make health$(RESET)"
+	@echo ""
 
-generar-env-laravel: ## 🔧 Generar Backend/.env desde el .env global
-	@echo "$(AMARILLO)🔧 Generando Backend/.env desde variables globales...$(RESET)"
+# ==============================================================================
+# GENERACIÓN DE CONFIGURACIÓN
+# ==============================================================================
+generar-env-laravel: ## Generar Backend/.env desde el .env global
+	@echo "$(AMARILLO)Generando Backend/.env...$(RESET)"
 	@echo "APP_NAME=$(APP_NAME)" > Backend/.env
 	@echo "APP_ENV=$(APP_ENV)" >> Backend/.env
-	@echo "APP_KEY=$(APP_KEY)" >> Backend/.env
+	@echo "APP_KEY=$$(grep '^APP_KEY=' .env | cut -d'=' -f2-)" >> Backend/.env
 	@echo "APP_DEBUG=$(APP_DEBUG)" >> Backend/.env
 	@echo "APP_URL=$(APP_URL)" >> Backend/.env
 	@echo "APP_LOCALE=$(APP_LOCALE)" >> Backend/.env
@@ -187,211 +203,231 @@ generar-env-laravel: ## 🔧 Generar Backend/.env desde el .env global
 	@echo "QUEUE_CONNECTION=$(QUEUE_CONNECTION)" >> Backend/.env
 	@echo "CACHE_STORE=$(CACHE_STORE)" >> Backend/.env
 	@echo "MAIL_MAILER=$(MAIL_MAILER)" >> Backend/.env
-	@echo "AI_BACKEND_URL=$(AI_BACKEND_URL)" >> Backend/.env
-	@echo "AI_INPUT_PATH=$(RUTA_CONTENEDOR_ENTRADA)" >> Backend/.env
-	@echo "AI_TIMEOUT=$(AI_TIMEOUT)" >> Backend/.env
-	@echo "IA_UPLOAD_URL=$(IA_UPLOAD_URL)" >> Backend/.env
-	@echo "LARAVEL_URL=$(LARAVEL_URL)" >> Backend/.env
-	@echo "IA_CALLBACK_SECRET=$(IA_CALLBACK_SECRET)" >> Backend/.env
-	@echo "AUDIO_MAX_SIZE_MB=$(AUDIO_MAX_SIZE_MB)" >> Backend/.env
 	@echo "REDIS_HOST=$(REDIS_HOST)" >> Backend/.env
 	@echo "REDIS_PASSWORD=$(REDIS_PASSWORD)" >> Backend/.env
 	@echo "REDIS_PORT=$(REDIS_PORT)" >> Backend/.env
+	@echo "IA_UPLOAD_URL=$(IA_UPLOAD_URL)" >> Backend/.env
+	@echo "LARAVEL_URL=$(LARAVEL_URL)" >> Backend/.env
+	@echo "IA_CALLBACK_SECRET=$(IA_CALLBACK_SECRET)" >> Backend/.env
+	@echo "AI_TIMEOUT=$(AI_TIMEOUT)" >> Backend/.env
+	@echo "AUDIO_MAX_SIZE_MB=$(AUDIO_MAX_SIZE_MB)" >> Backend/.env
 	@echo "SSE_HEARTBEAT_SECONDS=$(SSE_HEARTBEAT_SECONDS)" >> Backend/.env
 	@echo "SSE_POLL_INTERVAL_MICROSECONDS=$(SSE_POLL_INTERVAL_MICROSECONDS)" >> Backend/.env
-	@echo "$(VERDE)✓ Backend/.env generado.$(RESET)"
+	@echo "CORS_ALLOWED_ORIGINS=$(CORS_ALLOWED_ORIGINS)" >> Backend/.env
+	@echo "SANCTUM_STATEFUL_DOMAINS=$(SANCTUM_STATEFUL_DOMAINS)" >> Backend/.env
+	@echo "$(VERDE)[OK] Backend/.env generado.$(RESET)"
 
 # ==============================================================================
 # CICLO DE VIDA
 # ==============================================================================
+up: ## Levantar todos los servicios
+	@echo "$(AZUL)Levantando servicios...$(RESET)"
+	@docker ps -a --filter status=exited --filter status=created --format '{{.Names}}' | grep minerva | xargs -r docker rm -f 2>/dev/null || true
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front --profile back --profile ia up -d; \
+	else \
+		$(DC) up -d; \
+	fi
+	@echo "$(VERDE)[OK] Servicios levantados.$(RESET)"
 
-up: ## ▶️  Levantar todos los servicios
-	@echo "$(AZUL)▶️  Levantando servicios...$(RESET)"
-	$(DC) up -d
-	@echo "$(VERDE)✓ Servicios levantados.$(RESET)"
+down: ## Detener y eliminar contenedores
+	@echo "$(ROJO)Deteniendo servicios...$(RESET)"
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front --profile back --profile ia down; \
+	else \
+		$(DC) down; \
+	fi
+	@echo "$(VERDE)[OK] Servicios detenidos.$(RESET)"
 
-down: ## ⏹️  Detener todos los servicios
-	@echo "$(ROJO)⏹️  Deteniendo servicios...$(RESET)"
-	$(DC) down
-	@echo "$(VERDE)✓ Servicios detenidos.$(RESET)"
+restart: ## Reiniciar todos los servicios
+	@$(MAKE) --no-print-directory down
+	@$(MAKE) --no-print-directory up
 
-restart: ## 🔄 Reiniciar todos los servicios
-	@echo "$(AMARILLO)🔄 Reiniciando servicios...$(RESET)"
-	$(DC) restart
-	@echo "$(VERDE)✓ Servicios reiniciados.$(RESET)"
+build: ## Reconstruir imágenes Docker (sin caché)
+	@echo "$(AMARILLO)Reconstruyendo imágenes...$(RESET)"
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front --profile back --profile ia build --no-cache; \
+	else \
+		$(DC) build --no-cache; \
+	fi
 
-build: ## 🔨 Reconstruir imágenes Docker (sin caché)
-	@echo "$(AMARILLO)🔨 Reconstruyendo imágenes...$(RESET)"
-	$(DC) build --no-cache
+logs: ## Ver logs en tiempo real
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front --profile back --profile ia logs -f; \
+	else \
+		$(DC) logs -f; \
+	fi
 
-logs: ## 📋 Ver logs en tiempo real de todos los servicios
-	$(DC) logs -f
+status: ## Ver estado de los contenedores
+	@if [ "$(DEV)" = "0" ]; then \
+		$(DC) --profile front --profile back --profile ia ps; \
+	else \
+		$(DC) ps; \
+	fi
 
-status: ## 📊 Ver estado de los contenedores
-	$(DC) ps
+# ==============================================================================
+# DIAGNÓSTICO Y VALIDACIÓN
+# ==============================================================================
+check-env: ## Validar configuración del .env
+	@echo "$(AZUL)Validando .env [$(DEV)]$(RESET)"
+	@ERRORES=0; \
+	if [ ! -f .env ]; then echo "$(ROJO)[ERROR] No existe .env$(RESET)"; exit 1; fi; \
+	if [ "$(DEV)" = "0" ]; then \
+		echo "$(AMARILLO)Modo: PRODUCCIÓN$(RESET)"; \
+		if grep -q "CAMBIAR_" .env; then \
+			echo "$(ROJO)  [ERROR] Hay valores por cambiar (busca CAMBIAR_)$(RESET)"; ERRORES=1; \
+		fi; \
+		if grep -q "TU_IP_SERVIDOR" .env; then \
+			echo "$(ROJO)  [ERROR] Falta configurar IP del servidor$(RESET)"; ERRORES=1; \
+		fi; \
+	else \
+		echo "$(AMARILLO)Modo: DESARROLLO$(RESET)"; \
+	fi; \
+	IA_URL=$$(grep '^IA_UPLOAD_URL=' .env | cut -d'=' -f2); \
+	LAR_URL=$$(grep '^LARAVEL_URL=' .env | cut -d'=' -f2); \
+	echo "  IA_UPLOAD_URL = $$IA_URL"; \
+	echo "  LARAVEL_URL   = $$LAR_URL"; \
+	if echo "$$IA_URL" | grep -q "minerva-asr"; then \
+		echo "  $(AMARILLO)IA: nombre Docker interno (misma red)$(RESET)"; \
+	else \
+		echo "  $(VERDE)IA: dirección externa (distribuido)$(RESET)"; \
+	fi; \
+	if echo "$$LAR_URL" | grep -q "minerva-nginx"; then \
+		echo "  $(AMARILLO)Laravel: nombre Docker interno (misma red)$(RESET)"; \
+	else \
+		echo "  $(VERDE)Laravel: dirección externa (distribuido)$(RESET)"; \
+	fi; \
+	if [ "$$ERRORES" = "1" ]; then \
+		echo "$(ROJO)Corrige los errores antes de continuar.$(RESET)"; exit 1; \
+	fi; \
+	echo "$(VERDE)[OK] Configuración válida.$(RESET)"
+
+health: ## Verificar conectividad entre servicios
+	@echo "$(AZUL)Health Check$(RESET)"
+	@echo "$(AMARILLO)Backend:$(RESET)"
+	@$(DC) exec -T laravel-app php -r "echo '';" 2>/dev/null && echo "  $(VERDE)[OK] PHP-FPM$(RESET)" || echo "  $(ROJO)[FAIL] PHP-FPM$(RESET)"
+	@$(DC) exec -T laravel-app php -r "require '/var/www/vendor/autoload.php'; \$$a=require '/var/www/bootstrap/app.php'; \$$a->make('Illuminate\\Contracts\\Console\\Kernel')->bootstrap(); \Illuminate\Support\Facades\DB::connection()->getPdo();" 2>/dev/null && echo "  $(VERDE)[OK] Base de datos$(RESET)" || echo "  $(ROJO)[FAIL] Base de datos$(RESET)"
+	@$(DC) exec -T minerva-redis redis-cli ping 2>/dev/null | grep -q "PONG" && echo "  $(VERDE)[OK] Redis$(RESET)" || echo "  $(ROJO)[FAIL] Redis$(RESET)"
+	@echo "$(AMARILLO)IA:$(RESET)"
+	@$(DC) exec -T laravel-app curl -sf http://minerva-asr:8000/estado 2>/dev/null | grep -q "activa" && echo "  $(VERDE)[OK] ASR accesible desde Backend$(RESET)" || echo "  $(ROJO)[FAIL] ASR no accesible desde Backend$(RESET)"
+	@$(DC) exec -T laravel-app curl -sf http://minerva-asr:8000/estado_cola 2>/dev/null | grep -q "estado" && echo "  $(VERDE)[OK] Cola IA$(RESET)" || echo "  $(ROJO)[FAIL] Cola IA$(RESET)"
+	@echo "$(AMARILLO)Callbacks:$(RESET)"
+	@$(DC) exec -T minerva-asr curl -s -X POST http://minerva-nginx:80/api/ia/sse-update -H 'Content-Type: application/json' -H 'Accept: application/json' -H 'X-Callback-Secret: $(IA_CALLBACK_SECRET)' -d '{"uuid":"health","estado":"PROCESANDO","progreso":0}' 2>/dev/null | grep -q "uuid\|error\|message" && echo "  $(VERDE)[OK] IA -> Laravel (callback)$(RESET)" || echo "  $(ROJO)[FAIL] IA -> Laravel (callback)$(RESET)"
+	@echo "$(VERDE)[OK] Health check completado$(RESET)"
 
 # ==============================================================================
 # COMPONENTES (DEV: servicios | PROD: profiles)
 # ==============================================================================
+front-up: ## Levantar solo Frontend
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front up -d; \
+	else $(DC) up -d minerva-frontend; fi
 
-front-up: ## Levantar solo Front (DEV: frontend | PROD: profiles front)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile front up -d; \
-	else \
-		$(DC) up -d frontend; \
-	fi
+front-down: ## Bajar solo Frontend
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front stop; \
+	else $(DC) stop minerva-frontend; fi
 
-front-down: ## Bajar solo Front (DEV: frontend | PROD: profiles front)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile front stop; \
-	else \
-		$(DC) stop frontend; \
-	fi
+front-logs: ## Logs del Frontend
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front logs -f; \
+	else $(DC) logs -f minerva-frontend; fi
 
-front-logs: ## Logs solo Front (DEV: frontend | PROD: profiles front)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile front logs -f; \
-	else \
-		$(DC) logs -f frontend; \
-	fi
+back-up: ## Levantar solo Backend (app + db + redis + worker)
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back up -d; \
+	else $(DC) up -d laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
 
-back-up: ## Levantar solo Back (DEV: laravel-* + db | PROD: profiles back)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile back up -d; \
-	else \
-		$(DC) up -d laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
-	fi
+back-down: ## Bajar solo Backend
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back stop; \
+	else $(DC) stop laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
 
-back-down: ## Bajar solo Back (DEV: laravel-* + db | PROD: profiles back)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile back stop; \
-	else \
-		$(DC) stop laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
-	fi
+back-logs: ## Logs del Backend
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back logs -f; \
+	else $(DC) logs -f laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
 
-back-logs: ## Logs solo Back (DEV: laravel-* + db | PROD: profiles back)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile back logs -f; \
-	else \
-		$(DC) logs -f laravel-app laravel-web minerva-db minerva-redis laravel-worker; \
-	fi
+ia-up: ## Levantar solo IA (ASR + Diarizador)
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia up -d; \
+	else $(DC) up -d minerva-asr minerva-diarizador; fi
 
-ia-up: ## Levantar solo IA (DEV: minerva-* | PROD: profiles ia)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile ia up -d; \
-	else \
-		$(DC) up -d minerva-asr minerva-diarizador; \
-	fi
+ia-down: ## Bajar solo IA
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia stop; \
+	else $(DC) stop minerva-asr minerva-diarizador; fi
 
-ia-down: ## Bajar solo IA (DEV: minerva-* | PROD: profiles ia)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile ia stop; \
-	else \
-		$(DC) stop minerva-asr minerva-diarizador; \
-	fi
-
-ia-logs: ## Logs solo IA (DEV: minerva-* | PROD: profiles ia)
-	@if [ "$(DEV)" = "0" ]; then \
-		$(DC) --profile ia logs -f; \
-	else \
-		$(DC) logs -f minerva-asr minerva-diarizador; \
-	fi
+ia-logs: ## Logs de IA
+	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia logs -f; \
+	else $(DC) logs -f minerva-asr minerva-diarizador; fi
 
 # ==============================================================================
-# LARAVEL - Migraciones y Base de Datos
+# LARAVEL - Base de datos y mantenimiento
 # ==============================================================================
+migrate: ## Ejecutar migraciones
+	@$(DC) exec -T laravel-app php artisan migrate --force
 
-migrate: ## 🗄️  Ejecutar migraciones de Laravel
-	@echo "$(AMARILLO)🗄️ Ejecutando migraciones...$(RESET)"
-	$(DC) exec -T laravel-app php artisan migrate --force
+seed: ## Ejecutar seeders
+	@$(DC) exec -T laravel-app php artisan db:seed
 
-seed: ## 🌱 Ejecutar seeders de Laravel
-	@echo "$(AMARILLO)🌱 Ejecutando seeders...$(RESET)"
-	$(DC) exec -T laravel-app php artisan db:seed
+migrate-fresh: ## Recrear BD desde cero (DESTRUCTIVO)
+	@echo "$(ROJO)[WARN] Esto eliminará TODOS los datos. Ctrl+C para cancelar.$(RESET)"
+	@sleep 3
+	@$(DC) exec -T laravel-app php artisan migrate:fresh --seed
 
-migrate-fresh: ## 💥 Recrear toda la base de datos (¡DESTRUCTIVO!)
-	@echo "$(ROJO)💥 Recreando base de datos desde cero...$(RESET)"
-	$(DC) exec -T laravel-app php artisan migrate:fresh --seed
+permisos: ## Corregir permisos de storage
+	@$(DC) exec -T laravel-app chown -R www-data:www-data storage bootstrap/cache
+	@$(DC) exec -T laravel-app chmod -R 775 storage bootstrap/cache
+	@echo "$(VERDE)[OK] Permisos corregidos.$(RESET)"
 
-permisos: ## 🔐 Corregir permisos de storage de Laravel
-	@echo "$(AMARILLO)🔐 Corrigiendo permisos...$(RESET)"
-	$(DC) exec -T laravel-app chown -R www-data:www-data storage bootstrap/cache
-	$(DC) exec -T laravel-app chmod -R 775 storage bootstrap/cache
-	@echo "$(VERDE)✓ Permisos corregidos.$(RESET)"
-
-build-assets: ## 🎨 Compilar assets frontend con Vite
-	@echo "$(AMARILLO)🎨 Compilando assets con Vite...$(RESET)"
-	cd Backend && npm run build
-	@echo "$(VERDE)✓ Assets compilados.$(RESET)"
+build-assets: ## Compilar assets frontend (solo DEV)
+	@cd Backend && npm install && npm run build
 
 # ==============================================================================
-# ACCESO A LOS CONTENEDORES
+# ACCESO A CONTENEDORES
 # ==============================================================================
+shell-backend: ## Abrir shell en Laravel
+	@$(DC) exec laravel-app bash
 
-shell-backend: ## 🐚 Abrir shell en el contenedor de Laravel
-	$(DC) exec laravel-app bash
+shell-frontend: ## Abrir shell en Angular
+	@$(DC) exec minerva-frontend sh
 
-shell-frontend: ## 🐚 Abrir shell en el contenedor de Angular
-	$(DC) exec frontend sh
-
-shell-db: ## 🐚 Acceder a la consola de MariaDB
-	$(DC) exec minerva-db mariadb -u$${DB_USERNAME:-minerva} -p$${DB_PASSWORD:-minerva_secret} $${DB_DATABASE:-backend_minerva}
+shell-db: ## Abrir consola MariaDB
+	@$(DC) exec minerva-db mariadb -u$(DB_USERNAME) -p$(DB_PASSWORD) $(DB_DATABASE)
 
 # ==============================================================================
 # COLAS Y WORKERS
 # ==============================================================================
+cola-estado: ## Ver estado de la cola de procesamiento
+	@$(DC) exec -T laravel-app php artisan queue:monitor redis:process_audio,redis:default
 
-cola-estado: ## 📊 Ver estado de la cola de procesamiento
-	@echo "$(AZUL)📊 Estado de la cola...$(RESET)"
-	$(DC) exec -T laravel-app php artisan queue:monitor redis
+cola-limpiar: ## Limpiar jobs fallidos
+	@$(DC) exec -T laravel-app php artisan queue:flush
+	@echo "$(VERDE)[OK] Jobs fallidos limpiados.$(RESET)"
 
-cola-limpiar: ## 🧹 Limpiar jobs fallidos de la cola
-	@echo "$(AMARILLO)🧹 Limpiando jobs fallidos...$(RESET)"
-	$(DC) exec -T laravel-app php artisan queue:flush
+scale-workers: ## Escalar workers (make scale-workers N=3)
+	@$(DC) up -d --scale laravel-worker=$${N:-2} laravel-worker
+	@echo "$(VERDE)[OK] Workers escalados a $${N:-2}.$(RESET)"
 
-scale-workers: ## ▶️ Escalar workers de procesamiento (usage: make scale-workers N=3)
-	@echo "$(AZUL)▶️ Escalando workers a $(N)...$(RESET)"
-	$(DC) up -d --scale laravel-worker=$(N) laravel-worker
+worker-logs: ## Ver logs del worker
+	@$(DC) logs -f laravel-worker
 
-worker-logs: ## 📋 Ver logs del worker de procesamiento
-	@echo "$(AZUL)📋 Logs del worker...$(RESET)"
-	$(DC) logs -f laravel-worker
-
-sse-logs: ## 📡 Ver logs de eventos SSE
-	@echo "$(AZUL)📡 Logs de SSE...$(RESET)"
-	$(DC) exec -T laravel-app tail -f storage/logs/laravel.log | grep -i "sse\|callback\|transcrip"
-
-# ==============================================================================
-# LIMPIEZA
-# ==============================================================================
-
-clean: ## 🧹 Limpiar todo (contenedores, volúmenes, imágenes del proyecto)
-	@echo "$(ROJO)🧹 Limpiando todo el entorno Minerva...$(RESET)"
-	$(DC) down -v --rmi local
-	@echo "$(VERDE)✓ Limpieza completa.$(RESET)"
+sse-logs: ## Ver logs de SSE/callbacks
+	@$(DC) exec -T laravel-app tail -f storage/logs/laravel.log | grep -i "sse\|callback\|transcripci"
 
 # ==============================================================================
 # TESTING
 # ==============================================================================
+test: test-backend ## Ejecutar todos los tests
 
-test: test-backend test-e2e ## Ejecutar todos los tests (backend + E2E)
+test-backend: ## Ejecutar tests Laravel (Pest)
+	@echo "$(AMARILLO)Ejecutando tests...$(RESET)"
+	@$(DC) exec -T laravel-app php artisan test
 
-test-backend: ## Ejecutar tests de Laravel con Pest
-	@echo "$(AZUL)🧪 Ejecutando tests de Laravel...$(RESET)"
-	$(DC) exec -T laravel-app ./vendor/bin/pest tests/Arch.php tests/Feature tests/Unit
+test-e2e: ## Ejecutar tests E2E (Playwright)
+	@cd e2e && npx playwright test --reporter=list
 
-test-e2e: ## Ejecutar tests E2E con Playwright (modo dev)
-	@echo "$(AZUL)🎭 Ejecutando tests E2E con Playwright...$(RESET)"
-	cd e2e && npx playwright test --reporter=list
-
-test-e2e-ui: ## Ejecutar tests E2E con Playwright en modo UI
-	@echo "$(AZUL)🎭 Ejecutando tests E2E en modo UI...$(RESET)"
-	cd e2e && npx playwright test --ui
-
-test-e2e-report: ## Generar y mostrar reporte HTML de Playwright
-	@echo "$(AZUL)📊 Generando reporte E2E...$(RESET)"
-	cd e2e && npx playwright test --reporter=html && npx playwright show-report
-
-test-e2e-prod: ## Ejecutar tests E2E contra entorno de producción
-	@echo "$(AZUL)🎭 Ejecutando tests E2E contra producción...$(RESET)"
-	cd e2e && ENV=prod npx playwright test --reporter=list
+# ==============================================================================
+# LIMPIEZA
+# ==============================================================================
+clean: ## Limpiar todo (contenedores + volúmenes + imágenes)
+	@echo "$(ROJO)[WARN] Esto eliminará TODOS los contenedores, volúmenes e imágenes de Minerva.$(RESET)"
+	@echo "$(ROJO)[WARN] Ctrl+C en 5s para cancelar...$(RESET)"
+	@sleep 5
+	@$(MAKE) --no-print-directory down
+	@docker volume ls -q | grep minerva | xargs -r docker volume rm 2>/dev/null || true
+	@docker image ls -q --filter=reference='minerva-*' | xargs -r docker image rm 2>/dev/null || true
+	@echo "$(VERDE)[OK] Limpieza completada.$(RESET)"

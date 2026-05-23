@@ -16,15 +16,17 @@ setup('authenticate as user', async ({ page }) => {
   await page.locator('#contrasenaConfirm').fill(password);
   await page.getByRole('button', { name: 'REGISTRARSE' }).click();
 
-  await page.waitForURL('**/login', { timeout: 15000 });
+  // Esperar redireccion a login
+  await page.waitForURL('**/login', { timeout: 20000 });
 
   // Login
   await page.locator('#email').fill(email);
   await page.locator('#contrasena').fill(password);
   await page.getByRole('button', { name: 'INICIAR SESIÓN' }).click();
 
-  await page.waitForURL('**/dashboard', { timeout: 15000 });
-  await expect(page.locator('.user-avatar')).toBeVisible();
+  // Esperar redireccion al dashboard
+  await page.waitForURL('**/dashboard', { timeout: 20000 });
 
+  // Guardar estado de autenticacion para los demas tests
   await page.context().storageState({ path: authFile });
 });

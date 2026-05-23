@@ -18,8 +18,7 @@ test.describe('Flujo completo de usuario', () => {
     // 2. Registro
     await landing.clickCrearCuenta();
     const registro = new RegistroPage(page);
-    await registro.registrar('Usuario Completo', email, password);
-    await page.waitForURL('**/login', { timeout: 15000 });
+    await registro.registrar('Usuario Completo', email, password, true);
 
     // 3. Login
     const login = new LoginPage(page);

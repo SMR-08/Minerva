@@ -1,526 +1,513 @@
-# 🦉 Minerva - Proyecto TFG
+# Minerva — Plataforma de Transcripción Inteligente
 
-**Minerva** es una plataforma de transcripción de audio asistida por IA que combina reconocimiento automático del habla (ASR), diarización de hablantes, y una gestión organizada de transcripciones a través de una aplicación web completa.
-
----
-
-## 📑 Índice
-
-- [Arquitectura](#-arquitectura)
-- [Requisitos del Sistema](#-requisitos-del-sistema)
-- [Instalación Rápida](#-instalación-rápida)
-- [Configuración (.env)](#-configuración-env)
-- [Carpeta Compartida (Shared)](#-carpeta-compartida-shared)
-- [Comandos Disponibles (Make)](#-comandos-disponibles-make)
-- [Testing](#-testing)
-- [Producción y despliegue distribuido](#-producción-y-despliegue-distribuido)
-- [Servicios y Puertos](#-servicios-y-puertos)
-- [API del Backend Laravel](#-api-del-backend-laravel)
-- [API del Backend IA](#-api-del-backend-ia)
-- [Frontend (Angular 17)](#-frontend-angular-17)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
+> **TFG 2º DAW** — Desarrollo de Aplicaciones Web
+> Fecha: Mayo 2026
 
 ---
 
-## 🏗️ Arquitectura
+## ¿Qué es Minerva?
 
-### Flujo "Patata Caliente" (Audio Efímero)
+Minerva es una plataforma web que transforma grabaciones de clase en apuntes organizados automáticamente. El estudiante graba su clase, sube el audio, y Minerva:
 
-Minerva usa una arquitectura donde el archivo de audio **nunca se almacena permanentemente**:
+1. **Transcribe** el audio usando IA (Qwen3-ASR)
+2. **Identifica quién habla** — distingue profesor de alumnos (diarización con Senko)
+3. **Organiza** el contenido por Asignatura > Tema > Transcripción
+4. **Muestra** la transcripción con segmentos por hablante en tiempo real
+
+El resultado es una transcripción diarizada donde cada intervención está etiquetada con su hablante, accesible desde cualquier navegador.
+
+---
+
+## Arquitectura General
 
 ```
-┌──────────────┐  multipart  ┌────────────────────┐  streaming  ┌──────────────────┐
-│   Frontend   │ ───────────▶ │  Backend (Laravel) │ ──────────▶ │  Backend IA      │
-│  Angular 17  │             │  PHP-FPM + Nginx   │             │  ASR + Diarizador│
-│  :4200       │             │  :8001             │             │  :8002           │
-└──────────────┘             └─────────┬──────────┘             └────────┬─────────┘
-                                       │                                 │
-                                       ▼                                 ▼
-                              ┌─────────────────┐              ┌──────────────────┐
-                              │    MariaDB       │              │  GPU (NVIDIA)    │
-                              │    :3307         │              │  CUDA            │
-                              └─────────────────┘              │  /tmp/{uuid}.wav │───🗑️
-                                       ▲                       └──────────────────┘
-                                       │                                 │
-                                       └─────────── JSON ────────────────┘
-                                   (solo texto, ~50KB)
+┌─────────────┐         ┌──────────────────────────────────────┐
+│  Angular 17 │  HTTP   │           Backend Laravel 11          │
+│    (SPA)    │────────▶│  API REST + Sanctum Auth + Redis Q   │
+│  :4200 dev  │◀────────│  :8001 dev / :9122 prod (gateway)    │
+└─────────────┘         └──────────────┬───────────────────────┘
+                                       │
+                          Redis Queue   │  AudioProcessingJob
+                         (process_audio)│
+                                       ▼
+                        ┌──────────────────────────────┐
+                        │      Servicio IA (FastAPI)    │
+                        │  ASR (Qwen3) + Diarización   │
+                        │  :8002 dev                    │
+                        └──────────────┬───────────────┘
+                                       │
+                          Callbacks     │  POST /api/ia/callback
+                          Progreso      │  POST /api/ia/sse-update
+                                       ▼
+                        ┌──────────────────────────────┐
+                        │     Laravel (actualiza DB)    │
+                        └──────────────────────────────┘
 ```
 
-**Características clave:**
-- ✅ **Proxy streaming**: Laravel recibe y reenvía el audio a IA sin guardarlo
-- ✅ **Archivo efímero**: Solo existe en `/tmp` de IA durante el procesamiento
-- ✅ **Limpieza automática**: El archivo se elimina después de procesar
-- ✅ **Polling**: Actualizaciones cada 2 segundos vía HTTP
-- ✅ **Colas**: Múltiples peticiones se encolan y procesan secuencialmente
+### Flujo de procesamiento ("Patata Caliente")
 
-### Estados del Procesamiento
+El audio nunca se queda en un filesystem compartido. Se transmite directamente:
 
-| Estado | Descripción | UI Usuario |
-|--------|-------------|------------|
-| `SUBIENDO` | Upload en progreso | Barra de subida |
-| `ENCOLADO` | Esperando turno | "Posición #X en cola" |
-| `PROCESANDO` | IA trabajando | Barra de progreso con etapa |
-| `COMPLETADO` | Terminado | Botón "Ver resultado" |
-| `FALLIDO` | Error | Mensaje claro + reintentar |
+```
+1. Usuario sube audio → Laravel valida y guarda en storage
+2. Laravel encola AudioProcessingJob en Redis
+3. Worker lee el archivo y lo envía por HTTP multipart a la IA
+4. IA procesa secuencialmente: ASR → Diarización → Post-procesamiento
+5. IA envía progreso en tiempo real a Laravel (POST /api/ia/sse-update)
+6. IA envía resultado final (POST /api/ia/callback)
+7. Laravel actualiza la transcripción en BD
+8. Frontend hace polling cada 2s para mostrar progreso
+```
 
 ---
 
-## 💻 Requisitos del Sistema
+## Stack Tecnológico
 
-### Hardware Mínimo
+| Capa | Tecnología | Versión | Justificación |
+|------|-----------|---------|---------------|
+| Frontend | Angular (standalone) | 17 | Componentes sin módulos, signals |
+| Backend | Laravel (API REST) | 11 | Sanctum para SPA auth, queues nativas |
+| Base de datos | MariaDB | latest | Compatible MySQL, ligera |
+| Cola | Redis | 7-alpine | Procesamiento asíncrono de audio |
+| IA - ASR | Qwen3-ASR | 0.6B/1.7B | Transcripción multilengüe con timestamps |
+| IA - Diarización | Senko (pyannote VAD) | — | Identificación de hablantes |
+| GPU | NVIDIA CUDA | RTX 3070 Ti | Inferencia en tiempo real |
+| Contenedores | Docker Compose | — | Orquestación de 8 servicios |
+| Gateway (prod) | Nginx | alpine | Reverse proxy + rate limiting |
+| CI/CD | GitHub Actions | — | Tests automáticos en PR |
+| IaC | Terraform + AWS | implementado | ALB + ASG |
 
-| Componente | Mínimo | Recomendado |
-|---|---|---|
-| **CPU** | 4 núcleos | 8+ núcleos |
-| **RAM** | 16 GB | 32 GB |
-| **GPU NVIDIA** | 6 GB VRAM (ej. GTX 1660) | 12+ GB VRAM (ej. RTX 3060) |
-| **Disco** | 40 GB libres | 80+ GB SSD |
+---
 
-> [!WARNING]
-> Los modelos de IA (Qwen3-ASR + Senko) requieren GPU NVIDIA con soporte CUDA. Sin GPU, solo podrás usar el Frontend y Backend Laravel.
+## Requisitos del sistema
 
-### Límites de Archivos
+### Desarrollo
+- Docker + Docker Compose
+- NVIDIA GPU con drivers + nvidia-container-toolkit
+- `nvidia-persistenced` activo (el Makefile lo detecta)
+- 8GB+ VRAM (modo compact) o 16GB+ (modo full)
+- 16GB RAM mínimo
 
-| Concepto | Valor |
-|----------|-------|
-| **Tamaño máximo** | 2 GB |
-| **Formatos** | WAV, MP3, M4A, FLAC, OGG |
-| **Timeout upload** | 2 horas |
-| **Timeout procesamiento** | 2 horas |
-| **Duración máxima** | ~3 horas de audio |
+### Producción
+- Servidor con GPU NVIDIA (para IA)
+- Servidor web (puede ser el mismo o separado)
+- Docker + Docker Compose
+- Puerto 9122 accesible (gateway)
 
-### Software Requerido
+---
 
-| Software | Versión Mínima | Verificar con |
-|---|---|---|
-| **Docker Engine** | 24.0+ | `docker --version` |
-| **Docker Compose** | v2.20+ | `docker compose version` |
-| **NVIDIA Driver** | 535+ | `nvidia-smi` |
-| **NVIDIA Container Toolkit** | 1.14+ | `nvidia-ctk --version` |
-| **Git** | 2.30+ | `git --version` |
-| **Make** | 4.0+ | `make --version` |
-
-### Instalación de Dependencias (Arch Linux / CachyOS)
+## Inicio Rápido (Desarrollo)
 
 ```bash
-# Docker
-sudo pacman -S docker docker-compose
-sudo systemctl enable --now docker
-sudo usermod -aG docker $USER
+# 1. Clonar
+git clone <repo> && cd Minerva
 
-# NVIDIA Container Toolkit
-yay -S nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-# Make y Git
-sudo pacman -S make git
-```
-
----
-
-## 🚀 Instalación Rápida
-
-```bash
-# 1. Clonar el repositorio
-git clone https://github.com/SMR-08/Minerva.git Minerva
-cd Minerva
-
-# 2. Inicialización completa (un solo comando)
+# 2. Inicializar (crea .env, construye, levanta, migra, seedea)
 make init
+
+# 3. Verificar que todo funciona
+make health
+
+# 4. Acceder
+# Frontend:  http://localhost:4200
+# Backend:   http://localhost:8001
+# IA (ASR):  http://localhost:8002
+# Admin:     http://localhost:8001/admin (admin@minerva.com / admin123)
 ```
 
-El comando `make init` realiza automáticamente:
-1. ✅ Copia `.env.example` → `.env`
-2. ✅ Crea las carpetas compartidas (`Shared/`) (legacy)
-3. ✅ Construye las imágenes Docker
-4. ✅ Levanta todos los servicios (incluyendo workers)
-5. ✅ Instala dependencias PHP (Composer)
-6. ✅ Genera la `APP_KEY` de Laravel
-7. ✅ Corrige permisos de `storage/`
-8. ✅ Ejecuta migraciones y seeders de la base de datos
-9. ✅ Inicia los workers de procesamiento de cola
-
----
-
-## ⚙️ Configuración (.env)
-
-El archivo `.env` en la raíz controla **toda** la configuración. Está dividido en secciones:
-
-| Sección | Variables Clave | Descripción |
-|---|---|---|
-| **Frontend** | `FRONTEND_PORT` | Puerto del servidor Angular |
-| **Laravel** | `LARAVEL_PORT`, `DB_*`, `APP_KEY` | Puerto API, credenciales BD |
-| **IA** | `MODELO_ASR`, `DISPOSITIVO_ASR`, `ID_GPU` | Modelo, dispositivo CUDA, GPU |
-| **Comunicación** | `AI_BACKEND_URL`, `URL_DIARIZADOR` | URLs internas Docker |
-| **Patata Caliente** | `IA_UPLOAD_URL`, `IA_CALLBACK_SECRET`, `LARAVEL_URL` | Upload streaming y callbacks |
-| **Límites** | `AUDIO_MAX_SIZE_MB`, `UPLOAD_TIMEOUT_HOURS` | Tamaño máximo (2048MB), timeout (2h) |
-| **Workers** | `WORKER_REPLICAS` | Número de workers de procesamiento |
-
-### Variables nuevas para "Patata Caliente"
+### Comandos esenciales
 
 ```bash
-# Upload streaming a IA
-IA_UPLOAD_URL=http://minerva-asr:8000
-
-# Secret para autenticar callbacks (¡cambiar en producción!)
-IA_CALLBACK_SECRET=tu_secreto_super_seguro
-
-# URL de Laravel vista desde IA
-LARAVEL_URL=http://laravel-app:80
-
-# Límites de upload
-AUDIO_MAX_SIZE_MB=2048
-UPLOAD_TIMEOUT_HOURS=2
-
-# Workers de procesamiento
-WORKER_REPLICAS=2
+make help          # Ver todos los comandos disponibles
+make up            # Levantar servicios
+make down          # Detener servicios
+make health        # Verificar conectividad entre servicios
+make test-backend  # Ejecutar 55 tests (Pest)
+make logs          # Ver logs en tiempo real
+make status        # Estado de contenedores
 ```
-
-Consulta `.env.example` para ver todas las opciones con documentación inline.
 
 ---
 
-## 📂 Carpeta Compartida (Shared) - Legacy
+## Despliegue en Producción
 
-> [!NOTE]
-> En la arquitectura actual "Patata Caliente", **ya no se usa la carpeta Shared/** para archivos de audio.
-> Se mantiene solo para compatibilidad con versiones anteriores.
+Minerva soporta dos modos de despliegue:
 
-**Flujo anterior (legacy):**
-```
-Shared/
-├── entrada/    ← Laravel depositaba los audios aquí
-└── salida/     ← La IA escribía las transcripciones aquí
-```
-
-**Flujo actual (Patata Caliente):**
-1. El usuario sube un audio a través del Frontend.
-2. Laravel hace **proxy streaming** del audio directamente a IA.
-3. IA guarda temporalmente en `/tmp/{uuid}.wav`.
-4. IA procesa y elimina el archivo inmediatamente.
-5. IA envía el resultado (JSON ~50KB) a Laravel vía callback HTTP.
-6. Laravel persiste la transcripción en la base de datos.
-
-**Ventajas del nuevo flujo:**
-- ✅ Sin almacenamiento innecesario de archivos grandes (2GB+)
-- ✅ Backend ligero (no necesita espacio para audios)
-- ✅ Limpieza automática después de procesar
-- ✅ Funciona con IA en servidor separado (solo HTTP)
-
----
-
-## 🛠️ Comandos Disponibles (Make)
+### Monolítico (todo en un servidor)
 
 ```bash
-make help             # Muestra todos los comandos disponibles
-
-# --- Ciclo de vida ---
-make init             # 🚀 Inicialización completa (primera vez)
-make up               # ▶️  Levantar servicios
-make down             # ⏹️  Detener servicios
-make restart          # 🔄 Reiniciar servicios
-make build            # 🔨 Reconstruir imágenes (sin caché)
-make logs             # 📋 Ver logs en tiempo real
-make status           # 📊 Estado de contenedores
-
-# --- Base de datos ---
-make migrate          # 🗄️  Ejecutar migraciones
-make seed             # 🌱 Ejecutar seeders
-make migrate-fresh    # 💥 Recrear BD completa (¡DESTRUCTIVO!)
-
-# --- Colas y Workers ---
-make cola-estado      # 📊 Ver estado de la cola de procesamiento
-make cola-limpiar     # 🧹 Limpiar jobs fallidos de la cola
-make scale-workers N=3 # ▶️  Escalar workers (ej: N=3)
-make worker-logs      # 📋 Ver logs del worker de procesamiento
-make sse-logs         # 📡 Ver logs de eventos SSE
-
-# --- Testing ---
-make test             # 🧪 Ejecutar todos los tests (backend + E2E)
-make test-backend     # 🧪 Tests de Laravel con Pest
-make test-e2e         # 🎭 Tests E2E con Playwright (dev)
-make test-e2e-ui      # 🎭 Playwright en modo UI interactivo
-make test-e2e-report  # 📊 Generar y mostrar reporte HTML
-make test-e2e-prod    # 🎭 Tests E2E contra producción
-
-# --- Acceso a contenedores ---
-make shell-backend    # 🐚 Shell en Laravel
-make shell-frontend   # 🐚 Shell en Angular
-make shell-db         # 🐚 Consola MariaDB
-
-# --- Permisos y limpieza ---
-make permisos         # 🔐 Corregir permisos de storage
-make clean            # 🧹 Limpiar todo (contenedores, volúmenes, imágenes)
+cp .env.production.example .env
+nano .env   # Configurar IPs, passwords, APP_KEY
+DEV=0 make init
 ```
 
----
+### Distribuido (servicios separados)
 
-## 🧪 Testing
-
-Minerva cuenta con una suite de tests automatizada en **3 niveles** que cubre el flujo completo de usuario, la API REST y la arquitectura del código.
-
-### Resumen de Tests
-
-| Nivel | Herramienta | Tests | Assertions |
-|-------|-------------|-------|------------|
-| **Feature (API)** | Pest PHP | 53 | 131 |
-| **Arquitectura** | Pest Arch | 8 | 19 |
-| **Unit** | PHPUnit | 2 | 2 |
-| **E2E (Navegador)** | Playwright | 18 | - |
-| **TOTAL** | | **81** | **152** |
-
-### Tests de Backend (Pest PHP)
-
-Tests de integración contra la API REST de Laravel. Se ejecutan con SQLite en memoria para máxima velocidad.
+Cada servicio puede estar en un servidor diferente. La comunicación se configura en `.env`:
 
 ```bash
-# Ejecutar todos los tests de backend
-make test-backend
+# Servidor WEB (Frontend + Backend)
+DEV=0 make back-up
+DEV=0 make front-up
 
-# O directamente
-cd Backend && ./vendor/bin/pest
+# Servidor IA (GPU)
+DEV=0 make ia-up
 ```
 
-**Cobertura por módulo:**
+Variables críticas para modo distribuido:
 
-| Archivo | Qué prueba | Tests |
-|---------|-----------|-------|
-| `AuthTest.php` | Registro, login, logout, tokens Sanctum | 15 |
-| `AsignaturaTest.php` | CRUD completo, aislamiento por usuario | 13 |
-| `TemaTest.php` | CRUD, vinculación con asignatura, orden | 14 |
-| `ProcesamientoAudioTest.php` | Subida de audio, validaciones, estados | 6 |
-| `TranscripcionTest.php` | Listado, detalle, aislamiento | 5 |
-| `Arch.php` | Estructura del código, buenas prácticas Laravel | 8 |
+| Variable | Qué configura | Ejemplo |
+|----------|--------------|----------|
+| `IA_UPLOAD_URL` | Cómo Backend llega a IA | `http://IP_SERVIDOR_IA:8002` |
+| `LARAVEL_URL` | Cómo IA llega a Backend (callbacks) | `http://IP_SERVIDOR_WEB:9122` |
+| `CORS_ALLOWED_ORIGINS` | Orígenes permitidos para el frontend | `http://IP:9122` |
+| `SANCTUM_STATEFUL_DOMAINS` | Dominios SPA para auth | `IP:9122,IP` |
 
-### Tests E2E (Playwright)
-
-Tests de extremo a extremo que automatizan el navegador y verifican el flujo completo de usuario.
+### Verificación post-despliegue
 
 ```bash
-# Ejecutar tests E2E (contra frontend de desarrollo)
-make test-e2e
-
-# Modo UI interactivo (depuración visual)
-make test-e2e-ui
-
-# Generar reporte HTML con screenshots y vídeos
-make test-e2e-report
-
-# Ejecutar contra entorno de producción
-make test-e2e-prod
+DEV=0 make check-env   # Valida configuración
+DEV=0 make health      # Verifica conectividad
 ```
 
-**Flujos cubiertos:**
+### AWS con Terraform
 
-| Test | Qué verifica |
-|------|-------------|
-| `registro.spec.ts` | Registro exitoso, email duplicado, contraseñas no coinciden, campos vacíos, contraseña corta |
-| `login.spec.ts` | Login correcto, credenciales incorrectas, botón disabled |
-| `dashboard.spec.ts` | Carga correcta, secciones visibles, auth guard |
-| `asignaturas.spec.ts` | Crear, ver temas, eliminar |
-| `temas.spec.ts` | Crear, eliminar |
-| `navegacion-completa.spec.ts` | Flujo E2E completo: registro → login → crear asignatura → crear tema → navegar → logout |
+Infraestructura como codigo en `terraform/`.
 
-**Cambio de entorno:** Los tests E2E se configuran desde `e2e/playwright.config.ts`. Por defecto apuntan al servidor de desarrollo (`localhost:4200`). Para producción:
+**Dependencias**: `aws-cli` v2, `terraform` >= 1.5
+
+**Configurar credenciales del Lab** (expiran cada ~4h):
+
+1. Ir a AWS Academy > Learner Lab > Start Lab
+2. Click en "AWS Details" > Show (junto a "AWS CLI")
+3. Copiar el bloque en `~/.aws/credentials`:
+
+```ini
+[default]
+aws_access_key_id=ASIA...
+aws_secret_access_key=...
+aws_session_token=... (linea larga)
+```
+
+4. Verificar: `aws sts get-caller-identity`
+
+**Desplegar**:
 
 ```bash
-ENV=prod npx playwright test
+cd terraform/
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
 ```
 
-### CI/CD (GitHub Actions)
+**Destruir** (cuando no se use, ahorra budget):
 
-Cada push o pull request ejecuta automáticamente:
-
-1. Tests de backend (Pest) con base de datos MariaDB real
-2. Tests E2E (Playwright) con frontend y backend levantados
-3. Generación de reporte HTML y vídeos de fallos como artifacts
-
-El workflow se encuentra en `.github/workflows/tests.yml`.
-
----
-
-## 🚀 Producción y despliegue distribuido
-
-- Switch `DEV=1/0` en el `Makefile`:
-  - `DEV=1` (default): `docker-compose.yml` (desarrollo)
-  - `DEV=0`: `docker-compose.production.yml` (producción)
-
-- En producción puedes levantar componentes por separado con `profiles`:
-  - `DEV=0 make front-up` (gateway + frontend)
-  - `DEV=0 make back-up` (backend + BD)
-  - `DEV=0 make ia-up` (IA)
-
-Guía completa: `docs/DEPLOYMENT.md`.
-
----
-
-## 🌐 Servicios y Puertos
-
-| Servicio | Puerto Host | Puerto Interno | Contenedor | Acceso |
-|---|---|---|---|---|
-| **Frontend (Angular)** | `4200` | `4200` | `minerva-frontend` | `http://localhost:4200` |
-| **Backend (Laravel API)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/api` |
-| **Panel Admin (Laravel)** | `8001` | `80` | `minerva-nginx` | `http://localhost:8001/admin` |
-| **Base de Datos (MariaDB)** | `3307` | `3306` | `minerva-db` | `localhost:3307` |
-| **Redis** | `6379` | `6379` | `minerva-redis` | `localhost:6379` |
-| **IA - ASR** | `8002` | `8000` | `minerva-asr` | `http://localhost:8002` |
-| **IA - Diarizador** | — | `8000` | `minerva-diarizador` | Solo interno |
-
-> **Panel Admin:** Accede con `admin@minerva.com` / `admin123` para gestionar usuarios y sistema.  
-> **Diarizador:** No expone puertos al host, solo se comunica internamente con el ASR.
-
----
-
-## 📡 API del Backend Laravel
-
-Base URL: `http://localhost:8001/api`
-
-### Autenticación
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/register` | Registrar nuevo usuario |
-| `POST` | `/login` | Iniciar sesión (token) |
-| `POST` | `/logout` | Cerrar sesión |
-| `GET` | `/me` | Datos del usuario autenticado |
-
-### Asignaturas y Temas
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/asignaturas` | Listar asignaturas del usuario |
-| `POST` | `/asignaturas` | Crear asignatura |
-| `GET` | `/asignaturas/{id}/temas` | Listar temas de una asignatura |
-| `POST` | `/temas` | Crear tema |
-
-### Transcripciones e IA
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/temas/{id}/procesar-audio` | Subir archivo de audio para transcribir |
-| `GET` | `/transcripciones` | Listar transcripciones del usuario |
-| `GET` | `/transcripciones/{id}` | Detalle completo de una transcripción |
-| `DELETE` | `/transcripciones/{id}` | Eliminar transcripción |
-
-> [!NOTE]
-> La documentación completa de rutas se puede generar con: `make shell-backend` → `php artisan route:list --json`
-
----
-
-## 🤖 API del Backend IA
-
-Base URL (interna): `http://minerva-asr:8000` | Acceso host: `http://localhost:8002`
-
-### Servicio ASR (Reconocimiento de Voz)
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/salud` | Estado del servicio y modelo cargado |
-| `POST` | `/transcribir` | Transcribe un archivo de audio |
-| `POST` | `/procesar_corpus` | Analiza representatividad de un corpus |
-
-**`POST /transcribir`** — Ejemplo:
-```json
-{
-  "ruta_audio": "/app/compartido/entrada/<uuid>/audio.wav",
-  "idioma": "es"
-}
-```
-
-**Respuesta:**
-```json
-{
-  "transcripcion": "Texto transcrito...",
-  "conversacion": { "hablantes": [...] },
-  "duracion_segundos": 120.5
-}
-```
-
-### Servicio Diarizador
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/salud` | Estado del servicio |
-| `POST` | `/diarizar` | Identifica hablantes en un audio |
-
-> [!NOTE]
-> El diarizador solo es accesible internamente desde el servicio ASR.
-
----
-
-## 🖥️ Frontend (Angular 17)
-
-El frontend es una SPA construida con Angular 17 que se comunica exclusivamente con la API de Laravel.
-
-**Características principales:**
-- Gestión de asignaturas, temas y transcripciones.
-- Subida de archivos de audio con seguimiento del proceso de transcripción.
-- Visualización de transcripciones planas y con diarización.
-- Sistema de tags/etiquetas.
-- Panel de administración.
-
-**Desarrollo:**
 ```bash
-# Levantar solo el frontend con hot-reload
-make up  # Ya incluye el frontend
-
-# O acceder a su shell para tareas específicas
-make shell-frontend
-npm run build   # Build de producción
+terraform destroy
 ```
+
+Escalado:
+- **Horizontal**: Auto Scaling Group (min=1, max=3, escala por CPU > 70%)
+- **Vertical**: Cambiar `instance_type` en `terraform.tfvars` y `terraform apply`
 
 ---
 
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 Minerva/
-├── .env                    # Variables de entorno (generado desde .env.example)
-├── .env.example            # Plantilla de configuración
-├── .gitignore              # Exclusiones de Git
-├── docker-compose.yml      # Orquestación de todos los servicios
-├── docker-compose.production.yml  # Configuración de producción
-├── Makefile                # Comandos de automatización
-├── README.md               # Este archivo
-│
-├── Shared/                 # 📂 Carpeta compartida IA ↔ Laravel (legacy)
-│   ├── entrada/            #    Audios subidos por usuarios
-│   └── salida/             #    Transcripciones generadas por IA
-│
-├── Frontend/               # 🖥️ Angular 17
-│   ├── src/
-│   ├── package.json
-│   └── angular.json
-│
-├── Backend/                # ⚙️ Laravel (PHP 8.4)
+├── Backend/           Laravel 11 API REST (PHP 8.3)
 │   ├── app/
-│   ├── database/
-│   ├── routes/
-│   ├── tests/              # 🧪 Tests de Pest (Feature + Arch)
-│   ├── docker/             #    Config Nginx + PHP
-│   ├── Dockerfile
-│   └── composer.json
-│
-├── e2e/                    # 🎭 Tests E2E con Playwright
-│   ├── pages/              #    Page Object Model
-│   ├── tests/              #    Specs de tests
-│   └── playwright.config.ts
-│
-├── .github/
-│   └── workflows/          # 🔄 CI/CD con GitHub Actions
-│       └── tests.yml
-│
-└── IA/                     # 🤖 FastAPI + GPU
-    ├── main.py             #    API principal ASR
-    ├── ASR/                #    Módulo de reconocimiento
-    ├── DIARIZADOR/         #    Módulo de diarización
-    ├── Dockerfile.asr
-    └── Dockerfile.diarizador
+│   │   ├── Models/        8 modelos (Usuario, Asignatura, Tema, Transcripcion...)
+│   │   ├── Http/          Controllers, Requests, Resources, Middleware
+│   │   ├── Services/      AudioProcessing, Asignatura, Tema, Transcripcion
+│   │   ├── Jobs/          AudioProcessingJob (Redis queue)
+│   │   └── Policies/      Asignatura, Tema (user-scoped)
+│   ├── database/          Migraciones, seeders, factories
+│   ├── tests/             55 tests (Pest) + 8 arch tests
+│   └── config/audio.php   Configuración centralizada de IA/audio
+├── Frontend/          Angular 17 SPA (standalone components)
+│   └── src/app/
+│       ├── dashboard/         Vista principal
+│       ├── asignatura-view/   Detalle de asignatura + temas
+│       ├── transcripcion-view/ Vista diarizada por hablante
+│       ├── formulario-subida/  Upload de audio + tracking
+│       └── services/          Auth, Minerva, SSE, Notification
+├── IA/                FastAPI (Python) — ASR + Diarización
+│   ├── main.py            Orquestador: /upload, /estado, worker_loop
+│   ├── procesamiento.py   Post-procesamiento (6 etapas)
+│   ├── ASR/asr.py         Wrapper Qwen3-ASR
+│   └── DIARIZADOR/        Senko + ffmpeg
+├── nginx-gateway/     Reverse proxy producción (puerto 9122)
+├── e2e/               Tests Playwright (Page Object Model)
+├── openspec/          Documentación técnica del proyecto
+├── docker-compose.yml          Desarrollo (8 servicios)
+├── docker-compose.production.yml  Producción (profiles: front, back, ia)
+└── Makefile           Orquestador (DEV=1/0)
 ```
 
 ---
 
-## 📜 Licencia
+## Base de Datos
 
-Proyecto TFG - Universidad. Todos los derechos reservados.
+### Modelo Entidad-Relación
+
+```
+Usuario (1) ─────┬───── (*) Asignatura (1) ─── (*) Tema (1) ─── (*) Transcripcion
+            │                                                    │
+            ├───── (*) Tag ──────────────────────────────────────────┘ (M:N)
+            ├───── (1) Rol
+            ├───── (1) EstadoUsuario
+            └───── (*) HistorialAcceso
+```
+
+### Tablas principales
+
+| Tabla | Propósito | Campos clave |
+|-------|----------|---------------|
+| `usuarios` | Usuarios del sistema | email, password_hash, id_rol, id_estado |
+| `asignaturas` | Materias del estudiante | nombre, profesor, color_hex, id_usuario |
+| `temas` | Temas dentro de asignatura | nombre, orden, id_asignatura |
+| `transcripciones` | Audio procesado | uuid, estado, texto_plano, texto_diarizado (JSON), progreso |
+| `tags` | Etiquetas personales | nombre, color_hex, id_usuario |
+| `roles` | ADMIN, USUARIO | nombre |
+| `estados_usuario` | ACTIVO, SUSPENDIDO, BANEADO | nombre |
+| `historial_accesos` | Auditoría de login | ip_acceso, user_agent, fecha |
+
+### Estados de procesamiento
+
+```
+SUBIENDO → ENCOLADO → PROCESANDO → COMPLETADO
+                                  → FALLIDO
+```
+
+Durante PROCESANDO, se actualizan `progreso_porcentaje` (0-100) y `etapa_actual` (INICIANDO, ASR, DIARIZACION, POSTPROCESAMIENTO).
+
+---
+
+## API REST
+
+### Autenticación (Sanctum)
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/api/register` | POST | — | Registro (nombre, email, password) |
+| `/api/login` | POST | — | Login → devuelve token Sanctum |
+| `/api/logout` | POST | Bearer | Cierra sesión (elimina token) |
+| `/api/user` | GET | Bearer | Datos del usuario autenticado |
+
+### Recursos (CRUD)
+
+| Recurso | Endpoints | Auth | Notas |
+|---------|-----------|------|-------|
+| Asignaturas | GET/POST/PUT/DELETE `/api/asignaturas` | Bearer | User-scoped via Policy |
+| Temas | GET/POST/PUT/DELETE `/api/temas` | Bearer | Filtro: `?asignatura_id=X` |
+| Tags | GET/POST/DELETE `/api/tags` | Bearer | User-scoped |
+| Transcripciones | GET/PUT/DELETE `/api/transcripciones/{id}` | Bearer | Incluye texto diarizado |
+
+### Procesamiento de Audio
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/api/temas/{id}/procesar-audio` | POST | Bearer | Upload multipart (audio + titulo + idioma) |
+| `/api/transcripciones/{uuid}/estado` | GET | Token query | Polling de progreso (cada 2s) |
+| `/api/ia/estado` | GET | Bearer | Health check del servicio IA |
+
+### Callbacks internos (IA → Laravel)
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/api/ia/callback` | POST | X-Callback-Secret | Resultado final de procesamiento |
+| `/api/ia/sse-update` | POST | X-Callback-Secret | Actualización de progreso |
+
+---
+
+## Servicio de IA
+
+### Pipeline de procesamiento (6 etapas)
+
+| # | Etapa | Tecnología | Qué hace |
+|---|-------|-----------|----------|
+| 1 | ASR | Qwen3-ASR | Transcribe audio → lista de palabras con timestamps |
+| 2 | Diarización | Senko (pyannote VAD) | Identifica segmentos por hablante |
+| 3 | Alineación | Custom (60% overlap) | Asigna cada palabra a un hablante |
+| 4 | Suavizado | Custom | Fusiona fragmentos cortos (<1s) |
+| 5 | Corrección | Custom | Resuelve segmentos "DESCONOCIDO" |
+| 6 | Roles | Custom | Profesor = hablante con más duración |
+
+### Modelos disponibles
+
+| Modelo | VRAM | Uso |
+|--------|------|-----|
+| Qwen3-ASR-0.6B | ~2GB | Modo compact (GPU 8GB) |
+| Qwen3-ASR-1.7B | ~5.5GB | Modo full (GPU 16GB+) |
+| Senko (pyannote) | ~3GB | Diarización (siempre) |
+
+### Concurrencia
+
+La IA procesa **un audio a la vez** (asyncio.Lock). Los demás se encolan. Esto es intencional: la GPU no puede paralelizar inferencia de modelos grandes sin fragmentar VRAM.
+
+---
+
+## Testing
+
+### Backend (55 tests, Pest)
+
+```bash
+make test-backend
+```
+
+| Suite | Tests | Cobertura |
+|-------|-------|-----------|
+| Auth | 15 | Registro, login, logout, validaciones, cuenta inactiva |
+| Asignaturas | 13 | CRUD completo, aislamiento por usuario, validaciones |
+| Temas | 14 | CRUD con binding a asignatura, ordenamiento |
+| Audio | 6 | Upload, validación de formato, creación de transcripción |
+| Transcripciones | 5 | Listado, detalle, aislamiento por usuario |
+| Arquitectura | 8 | No dd/dump, namespaces correctos, no env() en controllers |
+
+### E2E (Playwright)
+
+```bash
+make test-e2e
+```
+
+6 specs con Page Object Model: auth, login, registro, dashboard, asignaturas, navegación completa.
+
+### CI/CD
+
+GitHub Actions ejecuta tests automáticamente en cada PR a main.
+
+---
+
+## Decisiones de Diseño
+
+### ¿Por qué polling en vez de SSE real?
+
+PHP-FPM no soporta conexiones long-lived eficientemente. Con 20 usuarios concurrentes, SSE bloquearía 20 workers PHP. Polling cada 2s libera el worker en <100ms.
+
+### ¿Por qué Redis queue en vez de procesamiento síncrono?
+
+El audio puede tardar 30min-2h en procesarse. Un HTTP timeout mataría la conexión. La cola permite reintentos automáticos (3 intentos con backoff exponencial).
+
+### ¿Por qué "Patata Caliente" (streaming directo)?
+
+El audio se envía directamente de Laravel a IA via HTTP multipart. No se usa filesystem compartido. Más simple, menos puntos de fallo.
+
+### ¿Por qué Qwen3-ASR?
+
+Modelo open-source multilengüe con timestamps a nivel de palabra. Soporta español, inglés, francés, alemán, portugués, italiano, catalán, euskera, gallego. Funciona en GPU consumer (RTX 3070 Ti).
+
+### ¿Por qué Senko para diarización?
+
+Combina pyannote VAD con clustering de embeddings. Funciona sin necesidad de saber cuántos hablantes hay. Ligero comparado con alternativas.
+
+---
+
+## Seguridad
+
+| Aspecto | Implementación |
+|---------|----------------|
+| Auth frontend | Sanctum tokens (Bearer) |
+| Auth admin | Sesión web + middleware `EsAdmin` (id_rol=1) |
+| Auth callbacks IA | Header `X-Callback-Secret` validado con `hash_equals()` |
+| Aislamiento datos | Policies + scoped queries (usuario solo ve lo suyo) |
+| CORS | Configurado por env var, restrictivo en producción |
+| Rate limiting | Throttle en rutas sensibles (login: 10/min, registro: 5/min) |
+| Soft deletes | Datos nunca se borran físicamente |
+| Auditoría | HistorialAcceso registra cada login (IP, user-agent) |
+
+---
+
+## Estado Actual y Roadmap
+
+### Implementado
+
+- Autenticación completa (registro, login, logout, admin)
+- CRUD Asignaturas, Temas, Tags con policies
+- Pipeline completo de audio: upload → cola → ASR → diarización → callback
+- Frontend funcional con todas las vistas
+- Docker DEV + PROD con profiles
+- Makefile como orquestador completo
+- 55 tests backend + 8 tests arquitectura
+- CI/CD con GitHub Actions
+- Panel de administración web
+
+### Pendiente
+
+| Feature | Prioridad | Notas |
+|---------|-----------|-------|
+| Resumidor de clase | Alta | Columna `resumen_ia` existe en BD, falta lógica |
+| Terraform AWS | Alta | Implementado en `terraform/`. Falta probar con creds reales del Lab |
+| Sistema de Logging + Debug | Alta | JSON estructurado Loki-ready + debug granular por módulo. Ver `openspec/logging-debug-systems.md` |
+| Refactor MVC Laravel | Media | 2 fat controllers, enum EstadoTranscripcion, query scopes, 6 FormRequests. Ver `openspec/laravel-refactor.md` |
+| Cola unificada con concurrencia | Baja | Cola única que orqueste N workers = N audios simultáneos. Requiere reescribir IA (eliminar asyncio.Lock) y worker. Ajustable: 1=actual, N=servidor capaz. Reescritura aceptable. |
+| Mapa mental Mermaid | Baja | Columna existe, stretch goal |
+
+---
+
+## Configuración de Referencia
+
+### Variables de entorno principales
+
+| Variable | Propósito | Default (dev) |
+|----------|----------|---------------|
+| `DEV` | Modo Makefile | `1` |
+| `GPU_MODE` | compact (8GB) / full (16GB+) | `compact` |
+| `IA_UPLOAD_URL` | Backend → IA | `http://minerva-asr:8000` |
+| `LARAVEL_URL` | IA → Backend (callbacks) | `http://minerva-nginx:80` |
+| `IA_CALLBACK_SECRET` | Auth de callbacks | (generar con openssl) |
+| `MODELO_ASR` | Modelo de transcripción | `Qwen/Qwen3-ASR-0.6B` |
+| `AUDIO_MAX_SIZE_MB` | Tamaño máximo de upload | `2048` (2GB) |
+| `AI_TIMEOUT` | Timeout procesamiento | `7200` (2h) |
+
+### Puertos
+
+| Servicio | Desarrollo | Producción |
+|----------|-----------|------------|
+| Frontend | :4200 | :9122 (via gateway) |
+| Backend API | :8001 | :9122/api (via gateway) |
+| IA (ASR) | :8002 | interno (:8000) |
+| MariaDB | :3307 | interno (:3306) |
+| Redis | :6379 | interno (:6379) |
+| Gateway | — | :9122 |
+
+---
+
+## Troubleshooting
+
+### GPU no detectada
+```bash
+# Verificar nvidia-persistenced
+systemctl status nvidia-persistenced
+# Si está inactivo:
+sudo systemctl start nvidia-persistenced
+sudo systemctl enable nvidia-persistenced
+```
+
+### Servicios no conectan
+```bash
+make health   # Muestra qué falla
+make check-env  # Valida configuración
+```
+
+### Audio se sube pero no se procesa
+```bash
+make worker-logs   # Ver errores del worker
+make cola-estado   # Ver estado de la cola Redis
+```
+
+### CORS bloqueado
+Verificar que `CORS_ALLOWED_ORIGINS` y `SANCTUM_STATEFUL_DOMAINS` en `.env` coinciden con la URL desde donde accede el frontend.
+
+### Permisos de storage
+```bash
+make permisos   # Corrige ownership y chmod
+```
+
+---
+
+## Licencia
+
+Proyecto académico — TFG 2º DAW.

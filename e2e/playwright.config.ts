@@ -53,12 +53,20 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts/,
     },
     {
+      name: 'public',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /.*\/(registro|login|navegacion).*\.spec\.ts/,
+    },
+    {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
+      testIgnore: /.*\/(registro|login|navegacion).*\.spec\.ts/,
     },
   ],
   webServer: envConfig.webServer,

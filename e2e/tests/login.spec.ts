@@ -9,8 +9,7 @@ test.describe('Login de usuario', () => {
     const email = `login-${timestamp}@prueba.com`;
 
     await registro.goto();
-    await registro.registrar('Login User', email, 'password123');
-    await page.waitForURL('**/login', { timeout: 15000 });
+    await registro.registrar('Login User', email, 'password123', true);
 
     const login = new LoginPage(page);
     await login.login(email, 'password123');

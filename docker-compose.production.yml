@@ -13,7 +13,7 @@ services:
     build:
       context: ./nginx-gateway
       dockerfile: Dockerfile
-    image: minerva-nginx-gateway:production
+    image: ${IMAGE_REGISTRY:-}minerva-gateway:${IMAGE_TAG:-production}
     container_name: minerva-gateway
     restart: always
     ports:
@@ -47,7 +47,7 @@ services:
     build:
       context: ./Frontend
       dockerfile: Dockerfile.production
-    image: minerva-frontend:production
+    image: ${IMAGE_REGISTRY:-}minerva-frontend:${IMAGE_TAG:-production}
     container_name: minerva-frontend
     restart: always
     networks:
@@ -83,7 +83,7 @@ services:
       args:
         user: ${WWWUSER:-minerva}
         uid: ${WWWUSER_ID:-1000}
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-app
     restart: always
     working_dir: /var/www
@@ -126,6 +126,8 @@ services:
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
       - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
       - AI_TIMEOUT=${AI_TIMEOUT:-7200}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:9122}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:9122,localhost}
     networks:
       - minerva-network
     depends_on:
@@ -189,7 +191,7 @@ services:
   # ============================================================================
   laravel-worker:
     profiles: ["back"]
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-worker
     restart: always
     working_dir: /var/www
@@ -217,6 +219,8 @@ services:
       - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
       - AUDIO_MAX_SIZE_MB=${AUDIO_MAX_SIZE_MB:-2048}
       - AI_TIMEOUT=${AI_TIMEOUT:-7200}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:9122}
+      - SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:9122,localhost}
     command: php artisan queue:work redis --queue=process_audio,default --tries=3 --max-time=3600
     depends_on:
       minerva-db:
