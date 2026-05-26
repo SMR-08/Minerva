@@ -7,8 +7,10 @@ use App\Http\Requests\RegisterUserRequest;
 use App\Http\Resources\UsuarioResource;
 use App\Models\HistorialAcceso;
 use App\Models\Usuario;
+use App\Support\Debug;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -25,6 +27,16 @@ class AuthController extends Controller
         ]);
 
         $token = $usuario->createToken($peticion->device_name ?? 'default')->plainTextToken;
+
+        Debug::auth("Registro exitoso", [
+            'user_id' => $usuario->id_usuario,
+            'email' => $usuario->email,
+        ]);
+
+        Log::channel('structured')->info("Usuario registrado", [
+            'service' => 'laravel',
+            'user_id' => $usuario->id_usuario,
+        ]);
 
         return response()->json([
             'message' => 'Usuario registrado correctamente',
@@ -60,6 +72,16 @@ class AuthController extends Controller
 
         $token = $usuario->createToken($peticion->device_name ?? 'default')->plainTextToken;
 
+        Debug::auth("Login exitoso", [
+            'user_id' => $usuario->id_usuario,
+            'ip' => $peticion->ip(),
+        ]);
+
+        Log::channel('structured')->info("Login", [
+            'service' => 'laravel',
+            'user_id' => $usuario->id_usuario,
+        ]);
+
         return response()->json([
             'token' => $token,
             'usuario' => new UsuarioResource($usuario),
@@ -69,6 +91,11 @@ class AuthController extends Controller
     public function logout(Request $peticion)
     {
         $peticion->user()->currentAccessToken()->delete();
+
+        Debug::auth("Logout", [
+            'user_id' => $peticion->user()->id_usuario,
+        ]);
+
         return response()->json(['message' => 'Sesión cerrada correctamente']);
     }
 

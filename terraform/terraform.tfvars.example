@@ -1,0 +1,35 @@
+# ==============================================================================
+# Valores por defecto para AWS Academy Lab
+# ==============================================================================
+# Copiar a terraform.tfvars y ajustar segun necesidad:
+#   cp terraform.tfvars.example terraform.tfvars
+# ==============================================================================
+
+aws_region    = "us-east-1"
+project_name  = "minerva"
+key_name      = "vockey"
+
+# --- Escalado vertical (cambiar para mas potencia) ---
+# t3.micro  = 2 vCPU, 1GB  ($0.0104/h) — testing
+# t3.medium = 2 vCPU, 4GB  ($0.0416/h) — desarrollo
+# t3.large  = 2 vCPU, 8GB  ($0.0832/h) — produccion
+instance_type = "t3.medium"
+volume_size   = 25
+
+# --- Escalado horizontal ---
+asg_min     = 1
+asg_desired = 1
+asg_max     = 3
+
+# Umbrales de CPU para auto-scaling
+scale_up_cpu_threshold   = 70
+scale_down_cpu_threshold = 30
+
+# --- Red ---
+# Restringir SSH a tu IP: "X.X.X.X/32"
+allowed_ssh_cidr = "0.0.0.0/0"
+
+# --- Aplicacion ---
+github_repo   = "https://github.com/SMR-08/Minerva.git"
+github_branch = "main"
+app_port      = 9122

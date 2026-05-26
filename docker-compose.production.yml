@@ -13,7 +13,7 @@ services:
     build:
       context: ./nginx-gateway
       dockerfile: Dockerfile
-    image: minerva-nginx-gateway:production
+    image: ${IMAGE_REGISTRY:-}minerva-gateway:${IMAGE_TAG:-production}
     container_name: minerva-gateway
     restart: always
     ports:
@@ -47,7 +47,7 @@ services:
     build:
       context: ./Frontend
       dockerfile: Dockerfile.production
-    image: minerva-frontend:production
+    image: ${IMAGE_REGISTRY:-}minerva-frontend:${IMAGE_TAG:-production}
     container_name: minerva-frontend
     restart: always
     networks:
@@ -83,7 +83,7 @@ services:
       args:
         user: ${WWWUSER:-minerva}
         uid: ${WWWUSER_ID:-1000}
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-app
     restart: always
     working_dir: /var/www
@@ -120,7 +120,7 @@ services:
       - CACHE_STORE=${CACHE_STORE:-database}
       - REDIS_HOST=minerva-redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=null
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-minerva_dev_redis}
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
       - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
@@ -191,7 +191,7 @@ services:
   # ============================================================================
   laravel-worker:
     profiles: ["back"]
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-worker
     restart: always
     working_dir: /var/www
@@ -212,7 +212,7 @@ services:
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
       - REDIS_HOST=minerva-redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=null
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-minerva_dev_redis}
       - CACHE_STORE=${CACHE_STORE:-database}
       - IA_UPLOAD_URL=${IA_UPLOAD_URL:-http://minerva-asr:8000}
       - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
@@ -299,6 +299,7 @@ services:
       - "${IA_ASR_PORT:-8002}:8000"
     volumes:
       - ./IA/main.py:/app/main.py:ro
+      - ./IA/gpu_manager.py:/app/gpu_manager.py:ro
       - ./IA/procesamiento.py:/app/procesamiento.py:ro
       - ./IA/ASR:/app/ASR:ro
       - ${SHARED_DIR_ENTRADA:-./Shared/entrada}:${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
@@ -307,18 +308,23 @@ services:
       - ia_cache_torch:/root/.cache/torch
     environment:
       - GPU_MODE=${GPU_MODE:-compact}
+      - GPU_CONCURRENCY=${GPU_CONCURRENCY:-1}
+      - CPU_CONCURRENCY=${CPU_CONCURRENCY:-2}
+      - AUTO_SUMMARY=${AUTO_SUMMARY:-true}
+      - SUMMARY_MODEL=${SUMMARY_MODEL:-Qwen/Qwen3.5-0.8B-Instruct}
+      - SUMMARY_MAX_TOKENS=${SUMMARY_MAX_TOKENS:-1024}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-minerva_dev_redis}@minerva-redis:6379/0
+      - REDIS_QUEUE_KEY=${REDIS_QUEUE_KEY:-minerva_tasks}
+      - REDIS_STATUS_PREFIX=${REDIS_STATUS_PREFIX:-minerva_status}
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - MODELO_ASR=${MODELO_ASR:-Qwen/Qwen3-ASR-0.6B}
       - MODELO_ALIGNER=${MODELO_ALIGNER:-Qwen/Qwen3-ForcedAligner-0.6B}
       - DISPOSITIVO_ASR=${DISPOSITIVO_ASR:-cuda:0}
       - URL_DIARIZADOR=${URL_DIARIZADOR:-http://minerva-diarizador:8000}
-      - RUTA_ENTRADA=${RUTA_CONTENEDOR_ENTRADA:-/app/compartido/entrada}
-      - RUTA_SALIDA_TRANSCRIPCIONES=${RUTA_CONTENEDOR_SALIDA:-/app/compartido/salida}
-      - NOMBRE_ARCHIVO_TRANSCRIPCION=${NOMBRE_ARCHIVO_TRANSCRIPCION:-transcripcion.txt}
-      - NOMBRE_ARCHIVO_CONVERSACION=${NOMBRE_ARCHIVO_CONVERSACION:-conversacion.json}
-      - LARAVEL_URL=${LARAVEL_URL:-http://192.168.18.35:9122}
-      - CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
-      - RUTA_TEMPORAL=/tmp
+      - URL_RESUMIDOR=${URL_RESUMIDOR:-http://minerva-resumidor:8000}
+      - LARAVEL_URL=${LARAVEL_URL:-http://minerva-nginx:80}
+      - IA_CALLBACK_SECRET=${IA_CALLBACK_SECRET:-cambiar_por_secret_generado_con_openssl_rand_base64_32}
+      - RUTA_TEMPORAL=${RUTA_TEMPORAL:-/app/compartido/entrada}
     deploy:
       resources:
         limits:
@@ -336,6 +342,8 @@ services:
       - minerva-network
     depends_on:
       minerva-diarizador:
+        condition: service_healthy
+      minerva-redis:
         condition: service_healthy
     logging:
       driver: "json-file"
@@ -400,12 +408,63 @@ services:
       start_period: 60s
 
   # ============================================================================
+  # IA - Servicio Resumidor (Qwen3.5-0.8B)
+  # ============================================================================
+  minerva-resumidor:
+    profiles: ["ia"]
+    build:
+      context: ./IA/resumidor
+      dockerfile: Dockerfile.resumidor
+    image: minerva-resumidor:production
+    container_name: minerva-resumidor
+    restart: always
+    shm_size: 2gb
+    volumes:
+      - ia_cache_hf:/root/.cache/huggingface
+    environment:
+      - SUMMARY_MODEL=${SUMMARY_MODEL:-Qwen/Qwen3.5-0.8B}
+      - SUMMARY_INPUT_MAX_TOKENS=${SUMMARY_INPUT_MAX_TOKENS:-32768}
+      - DISPOSITIVO=${DISPOSITIVO_RESUMIDOR:-cuda:0}
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+          devices:
+            - driver: nvidia
+              device_ids: ['${ID_GPU:-0}']
+              capabilities: [gpu]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - minerva-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/estado"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # ============================================================================
   # REDIS - Broker de colas para Laravel
   # ============================================================================
   minerva-redis:
     profiles: ["back"]
     image: redis:7-alpine
     container_name: minerva-redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-minerva_dev_redis}
+      --bind 0.0.0.0
+      --appendonly yes
+      --appendfsync everysec
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -414,7 +473,7 @@ services:
       - minerva-network
     restart: always
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-minerva_dev_redis}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3

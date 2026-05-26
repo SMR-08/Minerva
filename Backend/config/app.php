@@ -123,4 +123,23 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Debug Modules (Development Only)
+    |--------------------------------------------------------------------------
+    |
+    | Granular debug flags per subsystem. Only active when APP_ENV != production.
+    | Each module emits to the 'debug' log channel when enabled.
+    |
+    */
+
+    'debug_modules' => [
+        'audio' => (bool) env('DEBUG_AUDIO', false),
+        'auth'  => (bool) env('DEBUG_AUTH', false),
+        'ia'    => (bool) env('DEBUG_IA', false),
+        'queue' => (bool) env('DEBUG_QUEUE', false),
+        'sse'   => (bool) env('DEBUG_SSE', false),
+        'db'    => (bool) env('DEBUG_DB', false),
+    ],
+
 ];

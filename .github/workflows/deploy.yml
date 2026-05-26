@@ -1,0 +1,141 @@
+# ==============================================================================
+# Desplegar Minerva — Despliegue a instancia AWS
+# ==============================================================================
+# Pipeline profesional: rsync código + pull imágenes GHCR + restart servicios.
+# No depende de git en la instancia.
+#
+# Trigger: manual (workflow_dispatch) — las creds del Lab expiran cada 4h.
+#
+# Secrets necesarios:
+#   SSH_PRIVATE_KEY  — Contenido de labsuser.pem (key pair vockey)
+#   ENV_PRODUCTION   — Contenido del .env de producción
+#
+# Opcionales (auto-detección de IP):
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+# ==============================================================================
+
+name: Desplegar Minerva
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_ip:
+        description: 'IP de la instancia (vacío = auto-detectar via AWS)'
+        required: false
+        type: string
+
+env:
+  DEPLOY_PATH: /home/ubuntu/Minerva
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    name: Desplegar (sync + pull + up)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determinar IP de la instancia
+        id: ip
+        run: |
+          if [ -n "${{ inputs.instance_ip }}" ]; then
+            echo "ip=${{ inputs.instance_ip }}" >> $GITHUB_OUTPUT
+          else
+            IP=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=minerva-app" \
+                        "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text)
+            echo "ip=$IP" >> $GITHUB_OUTPUT
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_DEFAULT_REGION: us-east-1
+
+      - name: Preparar SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/key
+          chmod 600 /tmp/key
+          echo "Target: ${{ steps.ip.outputs.ip }}"
+
+      - name: Sincronizar código a instancia
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='.env' \
+            --exclude='storage/logs' \
+            --exclude='storage/framework/cache' \
+            --chown=ubuntu:ubuntu \
+            -e "ssh -i /tmp/key -o StrictHostKeyChecking=no" \
+            ./ ubuntu@$VM_IP:${{ env.DEPLOY_PATH }}/
+
+      - name: Inyectar .env de producción
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@$VM_IP \
+            "sudo chown -R ubuntu:ubuntu ${{ env.DEPLOY_PATH }} 2>/dev/null || true"
+          echo "${{ secrets.ENV_PRODUCTION }}" | ssh -i /tmp/key \
+            -o StrictHostKeyChecking=no ubuntu@$VM_IP \
+            "cat > ${{ env.DEPLOY_PATH }}/.env"
+
+      - name: Autenticarse en GHCR en la instancia
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@$VM_IP \
+            "echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+
+      - name: Desplegar servicios
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@$VM_IP << 'ENDSSH'
+            cd /home/ubuntu/Minerva
+            # Asegurar permisos correctos tras rsync (incluye .env)
+            sudo chown -R ubuntu:ubuntu .
+            chmod -R u+w .
+            # Parar servicios y eliminar volumen de código (para que la imagen nueva aplique)
+            docker compose -f docker-compose.production.yml --profile front --profile back down 2>/dev/null || true
+            docker volume rm minerva_backend_app_production 2>/dev/null || true
+            # Verificar si la BD tiene credenciales correctas; si no, recrear volumen
+            source .env
+            docker compose -f docker-compose.production.yml up -d minerva-db
+            sleep 10
+            if ! docker exec minerva-db mariadb -u "$DB_USERNAME" -p"$DB_PASSWORD" -e "SELECT 1" "$DB_DATABASE" 2>/dev/null; then
+              echo "[WARN] BD con credenciales incorrectas. Recreando volumen..."
+              docker compose -f docker-compose.production.yml stop minerva-db
+              docker compose -f docker-compose.production.yml rm -f minerva-db
+              docker volume ls --format '{{.Name}}' | grep -i "db_data" | xargs -r docker volume rm
+            else
+              docker compose -f docker-compose.production.yml stop minerva-db
+            fi
+            # Pull imágenes y deploy
+            docker compose -f docker-compose.production.yml --profile front --profile back pull 2>/dev/null || true
+            DEV=0 make init
+          ENDSSH
+
+      - name: Verificar despliegue
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          sleep 15
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@$VM_IP \
+            "cd /home/ubuntu/Minerva && docker compose -f docker-compose.production.yml ps --format 'table {{.Name}}\t{{.Status}}'"
+          # Health check del gateway
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$VM_IP:9122/ || echo "000")
+          echo "Gateway HTTP: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "000" ]; then
+            echo "::warning::Gateway no responde, verificar manualmente"
+          fi
+          rm -f /tmp/key

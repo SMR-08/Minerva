@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('transcripciones', function (Blueprint $table) {
             // Estado del procesamiento: SUBIENDO, ENCOLADO, PROCESANDO, COMPLETADO, FALLIDO
-            $table->enum('estado', ['SUBIENDO', 'ENCOLADO', 'PROCESANDO', 'COMPLETADO', 'FALLIDO'])
+            $table->enum('estado', ['SUBIENDO', 'ENCOLADO', 'PROCESANDO', 'COMPLETADO', 'FALLIDO', 'RESUMIENDO', 'LISTO'])
                   ->default('SUBIENDO')
                   ->after('uuid_referencia')
                   ->comment('Estado actual del procesamiento');

@@ -1,37 +1,45 @@
-FROM nvcr.io/nvidia/pytorch:24.02-py3
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
 LABEL maintainer="mmaygir1509@g.educaan.es"
-LABEL description="API para procesamiento de audio ARS (Qwen3-ASR + Diarizacion) con GPU."
+LABEL description="API para procesamiento de audio ASR (Qwen3-ASR) con GPU."
 
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
 ENV TOKENIZERS_PARALLELISM=false
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN echo "--- Actualizando sistema... ---" && \
-    apt-get update && \
+# 1. Dependencias del sistema
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git ffmpeg \
-    && rm -rf /var/lib/apt/lists/* \
-    && echo "--- Sistema actualizado. ---"
+    ffmpeg git curl \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN echo "--- Instalando dependencias Python... ---" && \
-    pip install --no-cache-dir \
-    # Librerias de la API y Red:
-    fastapi \
-    "uvicorn[standard]" \
-    requests \
-    aiohttp \
-    # Modelo ASR Qwen3:
+# 2. Instalar uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# 3. Python 3.11 via uv
+RUN uv python install 3.11
+
+# 4. Crear venv e instalar dependencias
+RUN uv venv --python 3.11 /opt/venv && \
+    . /opt/venv/bin/activate && \
+    uv pip install \
+    torch --index-url https://download.pytorch.org/whl/cu121 && \
+    uv pip install \
+    transformers accelerate \
     qwen-asr \
-    # Utilidades de audio:
+    fastapi "uvicorn[standard]" \
+    requests aiohttp \
+    "redis[hiredis]" \
     soundfile \
     && echo "--- Dependencias instaladas. ---"
 
-# FlashAttention 2 para acelerar la inferencia del modelo
-RUN MAX_JOBS=4 pip install --no-cache-dir flash-attn --no-build-isolation || \
-    echo "AVISO: flash-attn no instalado. Inferencia seguira funcionando sin aceleracion extra."
+# 5. Activar venv por defecto
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/venv"
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
