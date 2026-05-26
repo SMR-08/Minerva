@@ -75,6 +75,15 @@ resource "aws_security_group" "app" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
+  # Redis para servidor IA (cola unificada)
+  ingress {
+    description = "Redis desde IA"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = var.ia_server_cidr
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

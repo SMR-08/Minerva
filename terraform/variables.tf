@@ -74,6 +74,12 @@ variable "allowed_ssh_cidr" {
   default     = "0.0.0.0/0" # En Lab es aceptable, en prod usar IP fija
 }
 
+variable "ia_server_cidr" {
+  description = "CIDRs del servidor IA (UMA) para acceso a Redis (cola unificada)"
+  type        = list(string)
+  default     = ["150.214.52.0/24", "150.214.40.119/32"]
+}
+
 variable "app_port" {
   description = "Puerto del gateway Nginx en las instancias"
   type        = number
@@ -92,4 +98,12 @@ variable "github_branch" {
   description = "Branch a desplegar"
   type        = string
   default     = "main"
+}
+
+# --- Dominio ---
+
+variable "domain_name" {
+  description = "Dominio personalizado para HTTPS (ej: minerva.mayger.uk). Dejar vacio para solo HTTP."
+  type        = string
+  default     = ""
 }
