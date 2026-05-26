@@ -24,6 +24,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   # Backend local — AWS Academy no garantiza acceso a S3 para state
@@ -34,4 +38,16 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+}
+
+# Contraseña Redis generada automáticamente
+resource "random_password" "redis" {
+  length  = 32
+  special = false # Redis no maneja bien caracteres especiales en URL
+}
+
+output "redis_password" {
+  description = "Contraseña Redis (usar en .env como REDIS_PASSWORD)"
+  value       = random_password.redis.result
+  sensitive   = true
 }
