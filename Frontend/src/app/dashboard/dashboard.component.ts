@@ -8,6 +8,8 @@ import { MinervaService, Asignatura, Transcripcion, Tema } from '../minerva.serv
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
 import { ModalComponent } from '../modal/modal.component';
+import { HeaderComponent } from '../layout/header/header.component';
+import { FooterComponent } from '../layout/footer/footer.component';
 
 interface AsignaturaExtended extends Asignatura {
   temas?: Tema[];
@@ -18,7 +20,7 @@ interface AsignaturaExtended extends Asignatura {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ModalComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ModalComponent, HeaderComponent, FooterComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -26,7 +28,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   asignaturas = signal<AsignaturaExtended[]>([]);
   transcripciones = signal<Transcripcion[]>([]);
   searchQuery = '';
-  userMenuOpen = false;
 
   menuAbiertoId = signal<number | null>(null);
   modalCrear = false;
@@ -132,13 +133,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onSearch(): void {}
-
-  toggleUserMenu(): void { this.userMenuOpen = !this.userMenuOpen; }
-
-  cerrarSesion(): void {
-    this.authService.logout();
-    this.router.navigate(['/login']);
-  }
 
   @HostListener('document:click')
   cerrarMenusGlobal(): void {

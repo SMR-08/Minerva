@@ -1,25 +1,7 @@
 <div class="dashboard-page">
   <div class="dashboard-bg-pattern"></div>
 
-  <header class="dash-header">
-    <div class="header-inner">
-      <div class="logo">
-        <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
-        <span class="logo-text">MINERVA</span>
-      </div>
-      <div class="header-actions">
-        <div class="user-avatar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          <div class="user-menu" *ngIf="userMenuOpen">
-            <a (click)="cerrarSesion()" class="menu-item">Cerrar sesión</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
+  <app-header></app-header>
 
   <main class="dash-main">
     <div class="search-bar">
@@ -183,34 +165,7 @@
     </div>
   </app-modal>
 
-  <footer class="dash-footer">
-    <div class="footer-inner" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 48px; max-width: 1200px; margin: 0 auto; padding: 0 48px;">
-      <div class="footer-brand" style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
-        <div class="logo">
-          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img-sm" />
-          <span class="logo-text">MINERVA</span>
-        </div>
-        <p class="footer-tagline">Sabiduría para el estudiante moderno.</p>
-      </div>
-      <div style="display: flex; gap: 128px;">
-        <div class="footer-column">
-          <h4>Producto</h4>
-          <a href="#">Características</a>
-          <a href="#">Precio</a>
-        </div>
-        <div class="footer-column">
-          <h4>Legal</h4>
-          <a href="#">Acerca de</a>
-          <a href="#">Contacto</a>
-        </div>
-        <div class="footer-column">
-          <h4>Empresa</h4>
-          <a href="#">Privacidad</a>
-          <a href="#">Términos</a>
-        </div>
-      </div>
-    </div>
-  </footer>
+  <app-footer></app-footer>
 
 <style>
   .menu-wrapper { position: relative; }
