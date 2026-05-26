@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transcripcion;
+use App\Support\Debug;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +82,19 @@ class SseController extends Controller
 
             case 'COMPLETADO':
                 $payload['url'] = url('/transcripcion/' . $transcripcion->id_transcripcion);
-                $payload['mensaje'] = 'Completado!';
+                $payload['mensaje'] = 'Transcripción completada. Generando resumen...';
+                break;
+
+            case 'RESUMIENDO':
+                $payload['progreso'] = $transcripcion->progreso_porcentaje ?? 85;
+                $payload['etapa'] = 'RESUMEN';
+                $payload['mensaje'] = 'Generando resumen con IA...';
+                break;
+
+            case 'LISTO':
+                $payload['url'] = url('/transcripcion/' . $transcripcion->id_transcripcion);
+                $payload['progreso'] = 100;
+                $payload['mensaje'] = 'Listo — transcripción y resumen disponibles.';
                 break;
 
             case 'FALLIDO':
@@ -89,6 +102,12 @@ class SseController extends Controller
                 $payload['mensaje'] = 'Error al procesar';
                 break;
         }
+
+        Debug::sse("Polling estado", [
+            'trace_id' => $uuid,
+            'estado' => $transcripcion->estado,
+            'progreso' => $transcripcion->progreso_porcentaje ?? 0,
+        ]);
 
         return response()->json($payload);
     }
@@ -206,6 +225,13 @@ class SseController extends Controller
         }
 
         $transcripcion->update($updateData);
+
+        Debug::sse("SSE update recibido de IA", [
+            'trace_id' => $uuid,
+            'estado' => $request->estado,
+            'progreso' => $request->progreso,
+            'etapa' => $request->etapa,
+        ]);
 
         return response()->json(['ok' => true]);
     }
