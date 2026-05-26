@@ -75,9 +75,40 @@ variable "allowed_ssh_cidr" {
 }
 
 variable "ia_server_cidr" {
-  description = "CIDRs del servidor IA (UMA) para acceso a Redis (cola unificada)"
+  description = <<-EOT
+    IPs del servidor de IA externo para acceso a Redis (puerto 6379).
+    Se ignora si enable_ia_gpu=true (se calcula automáticamente).
+    Formato CIDR. Ejemplos:
+      - IP fija:    ["203.0.113.50/32"]
+      - Subred:    ["10.0.1.0/24"]
+      - Vacío:     [] (IA local o enable_ia_gpu=true)
+  EOT
   type        = list(string)
-  default     = ["150.214.52.0/24", "150.214.40.119/32"]
+  default     = []
+}
+
+# --- IA GPU (instancia separada) ---
+
+variable "enable_ia_gpu" {
+  description = <<-EOT
+    Levantar instancia GPU para IA automáticamente.
+    true  = crea instancia g4dn/g5, conecta a Redis, abre SG — todo automático.
+    false = usar ia_server_cidr para conectar IA externa (default).
+  EOT
+  type    = bool
+  default = false
+}
+
+variable "ia_instance_type" {
+  description = "Tipo de instancia GPU para IA (solo si enable_ia_gpu=true)"
+  type        = string
+  default     = "g4dn.xlarge" # 1x T4 16GB — suficiente para los 3 modelos
+}
+
+variable "ia_volume_size" {
+  description = "Disco para instancia IA en GB (modelos ~15GB + Docker)"
+  type        = number
+  default     = 60
 }
 
 variable "app_port" {
