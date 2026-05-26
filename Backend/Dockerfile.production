@@ -78,6 +78,7 @@ RUN useradd -G www-data,root -u $uid -d /home/$user $user && \
 
 # Configure PHP for production
 COPY docker/php/production.ini /usr/local/etc/php/conf.d/production.ini
+COPY docker/php/fpm-logging.conf /usr/local/etc/php-fpm.d/zz-logging.conf
 
 # Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache && \
