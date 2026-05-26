@@ -31,3 +31,19 @@ output "ssh_command" {
   description = "Comando SSH para conectar a una instancia"
   value       = "ssh -i ~/.ssh/labsuser.pem ubuntu@<IP>"
 }
+
+output "acm_validation_records" {
+  description = "Registros DNS para validar el certificado ACM (crear en Cloudflare como CNAME, proxy OFF)"
+  value = var.domain_name != "" ? {
+    for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.domain_name => {
+      type  = dvo.resource_record_type
+      name  = dvo.resource_record_name
+      value = dvo.resource_record_value
+    }
+  } : {}
+}
+
+output "app_url" {
+  description = "URL de la aplicacion"
+  value       = var.domain_name != "" ? "https://${var.domain_name}" : "http://${aws_lb.main.dns_name}"
+}
