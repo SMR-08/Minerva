@@ -60,6 +60,8 @@ class AudioProcessingJob implements ShouldQueue
 
         // Asegurar que el directorio existe con permisos correctos (www-data)
         Storage::makeDirectory('temp-audio');
+        // Asegurar permisos legibles por www-data (PHP-FPM) — el worker puede correr como root
+        chmod(Storage::path('temp-audio'), 0755);
 
         if (Storage::exists($this->rutaArchivo) && !Storage::exists($tempPath)) {
             Storage::move($this->rutaArchivo, $tempPath);
