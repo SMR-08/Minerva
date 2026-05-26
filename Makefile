@@ -342,17 +342,17 @@ back-logs: ## Logs del Backend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back logs -f; \
 	else $(DC) logs -f laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
 
-ia-up: ## Levantar solo IA (ASR + Diarizador)
+ia-up: ## Levantar solo IA (ASR + Diarizador + Resumidor)
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia up -d; \
-	else $(DC) up -d minerva-asr minerva-diarizador; fi
+	else $(DC) up -d minerva-asr minerva-diarizador minerva-resumidor; fi
 
 ia-down: ## Bajar solo IA
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia stop; \
-	else $(DC) stop minerva-asr minerva-diarizador; fi
+	else $(DC) stop minerva-asr minerva-diarizador minerva-resumidor; fi
 
 ia-logs: ## Logs de IA
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia logs -f; \
-	else $(DC) logs -f minerva-asr minerva-diarizador; fi
+	else $(DC) logs -f minerva-asr minerva-diarizador minerva-resumidor; fi
 
 # ==============================================================================
 # LARAVEL - Base de datos y mantenimiento
@@ -391,8 +391,8 @@ shell-db: ## Abrir consola MariaDB
 # ==============================================================================
 # COLAS Y WORKERS
 # ==============================================================================
-cola-estado: ## Ver estado de la cola de procesamiento
-	@$(DC) exec -T laravel-app php artisan queue:monitor redis:process_audio,redis:default
+cola-estado: ## Ver estado de la cola unificada
+	@$(DC) exec -T laravel-app php artisan tinker --execute="echo 'minerva_tasks: ' . \Illuminate\Support\Facades\Redis::llen('minerva_tasks') . ' tareas en cola';"
 
 cola-limpiar: ## Limpiar jobs fallidos
 	@$(DC) exec -T laravel-app php artisan queue:flush
