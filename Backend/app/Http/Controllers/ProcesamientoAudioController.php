@@ -56,10 +56,14 @@ class ProcesamientoAudioController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            Log::error("Error al verificar servicio IA", [
-                'exception' => $e->getMessage(),
-            ]);
-            $estado['ai_service'] = 'unreachable';
+            // HTTP falló — fallback a Redis (modo distribuido)
+            try {
+                $pendientes = \Illuminate\Support\Facades\Redis::connection('ia')->llen('minerva_tasks');
+                $estado['ai_service'] = 'online (distribuido)';
+                $estado['ai_queue_status'] = ['peticiones_en_espera' => $pendientes];
+            } catch (\Exception $redisEx) {
+                $estado['ai_service'] = 'unreachable';
+            }
         }
 
         return response()->json($estado);
@@ -93,14 +97,15 @@ class ProcesamientoAudioController extends Controller
 
         $request->validate([
             'uuid' => 'required|string|exists:transcripciones,uuid_referencia',
-            'estado' => 'required|in:COMPLETADO,FALLIDO',
+            'estado' => 'required|in:PROCESANDO,COMPLETADO,FALLIDO,RESUMIENDO,LISTO',
             'resultado' => 'required_if:estado,COMPLETADO|array',
             'error' => 'required_if:estado,FALLIDO|string',
+            'resumen' => 'nullable|string',
         ]);
 
         $this->audioProcessingService->procesarCallback(
             $request->uuid,
-            $request->only(['estado', 'resultado', 'error']),
+            $request->only(['estado', 'resultado', 'error', 'resumen']),
         );
 
         return response()->json(['ok' => true]);

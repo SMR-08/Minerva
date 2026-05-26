@@ -3,22 +3,32 @@
 namespace App\Jobs;
 
 use App\Models\Transcripcion;
+use App\Support\Debug;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * Encola una tarea de transcripción en la cola unificada (Redis).
+ *
+ * Este job NO procesa audio. Solo:
+ * 1. Mueve el archivo a temp-audio/ (accesible por el endpoint de descarga)
+ * 2. Hace RPUSH a minerva_tasks con la metadata
+ *
+ * La IA consume de minerva_tasks via BRPOP y descarga el audio cuando le toca.
+ */
 class AudioProcessingJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
-    public $timeout = 7200;
-    public $backoff = [60, 300, 900];
+    public $timeout = 30; // Solo encola, no espera procesamiento
+    public $backoff = [5, 15, 30];
     public $deleteWhenMissingModels = true;
 
     protected Transcripcion $transcripcion;
@@ -38,91 +48,74 @@ class AudioProcessingJob implements ShouldQueue
     public function handle(): void
     {
         $uuid = $this->transcripcion->uuid_referencia;
-        $intento = $this->attempts();
 
-        Log::info("AudioProcessingJob intento {$intento}/{$this->tries} para {$uuid}");
+        Debug::queue("Encolando tarea en cola unificada", [
+            'trace_id' => $uuid,
+            'idioma' => $this->idioma,
+        ]);
 
-        // Si ya falló demasiadas veces, marcar como FALLIDO directamente
-        if ($intento > $this->tries) {
-            Log::warning("Job {$uuid} excedió {$this->tries} intentos, marcando como FALLIDO");
-            $this->transcripcion->update([
-                'estado' => 'FALLIDO',
-                'error_mensaje' => 'IA no disponible tras ' . $this->tries . ' intentos',
-            ]);
-            $this->delete();
-            return;
+        // Mover archivo a temp-audio/ para el endpoint de descarga
+        $extension = pathinfo($this->rutaArchivo, PATHINFO_EXTENSION) ?: 'mp3';
+        $tempPath = "temp-audio/{$uuid}.{$extension}";
+
+        // Asegurar que el directorio existe con permisos correctos (www-data)
+        Storage::makeDirectory('temp-audio');
+
+        if (Storage::exists($this->rutaArchivo) && !Storage::exists($tempPath)) {
+            Storage::move($this->rutaArchivo, $tempPath);
         }
 
+        if (!Storage::exists($tempPath)) {
+            throw new \Exception("Archivo no encontrado: {$this->rutaArchivo} ni {$tempPath}");
+        }
+
+        // RPUSH a la cola unificada
+        $tarea = json_encode([
+            'type' => 'transcription',
+            'uuid' => $uuid,
+            'idioma' => $this->idioma,
+            'audio_url' => url("/api/internal/audio-download/{$uuid}"),
+            'callback_url' => route('ia.callback'),
+            'created_at' => now()->toIso8601String(),
+        ]);
+
+        Redis::connection('ia')->rpush('minerva_tasks', $tarea);
+
+        // Actualizar estado
         $this->transcripcion->update([
-            'estado' => 'PROCESANDO',
-            'etapa_actual' => 'INICIANDO',
+            'estado' => 'ENCOLADO',
+            'etapa_actual' => 'EN_COLA',
             'progreso_porcentaje' => 0,
         ]);
 
-        $urlIA = config('audio.ia.upload_url');
-        $callbackUrl = route('ia.callback');
-        $timeout = config('audio.ia.timeout', 7200);
-
-        try {
-            if (!Storage::exists($this->rutaArchivo)) {
-                throw new \Exception('Archivo de audio no encontrado: ' . $this->rutaArchivo);
-            }
-
-            $stream = Storage::readStream($this->rutaArchivo);
-
-            if (!is_resource($stream)) {
-                throw new \Exception('No se pudo abrir stream del archivo: ' . $this->rutaArchivo);
-            }
-
-            $response = Http::timeout($timeout)
-                ->withHeaders(['X-Callback-Secret' => config('audio.ia.callback_secret')])
-                ->attach(
-                    'audio',
-                    $stream,
-                    $uuid . '.' . pathinfo($this->rutaArchivo, PATHINFO_EXTENSION)
-                )
-                ->post("{$urlIA}/upload", [
-                    'uuid' => $uuid,
-                    'idioma' => $this->idioma,
-                    'callback_url' => $callbackUrl,
-                ]);
-
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-
-            if (!$response->successful()) {
-                throw new \Exception('IA rechazó el procesamiento: HTTP ' . $response->status());
-            }
-
-            Log::info("Audio {$uuid} enviado a IA exitosamente");
-
-        } catch (\Exception $e) {
-            Log::error("AudioProcessingJob error para {$uuid}: " . $e->getMessage());
-
-            // Si es el último intento, fallar definitivamente
-            if ($intento >= $this->tries) {
-                $this->transcripcion->update([
-                    'estado' => 'FALLIDO',
-                    'error_mensaje' => 'Error tras ' . $intento . ' intentos: ' . $e->getMessage(),
-                ]);
-                $this->delete();
-                return;
-            }
-
-            throw $e; // Re-lanzar para que Laravel reintente
-        }
+        Log::channel('structured')->info("Tarea encolada en minerva_tasks", [
+            'trace_id' => $uuid,
+            'service' => 'worker',
+            'type' => 'transcription',
+        ]);
     }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error("AudioProcessingJob fallido definitivamente para {$this->transcripcion->uuid_referencia}");
+        $uuid = $this->transcripcion->uuid_referencia;
+
+        Log::channel('structured')->critical("AudioProcessingJob fallido", [
+            'trace_id' => $uuid,
+            'service' => 'worker',
+            'error' => $exception->getMessage(),
+        ]);
 
         $this->transcripcion->update([
             'estado' => 'FALLIDO',
-            'error_mensaje' => 'Error después de ' . $this->attempts() . ' intentos: ' . $exception->getMessage(),
+            'error_mensaje' => 'Error al encolar: ' . $exception->getMessage(),
         ]);
 
+        // Limpiar archivo temporal
+        $extension = pathinfo($this->rutaArchivo, PATHINFO_EXTENSION) ?: 'mp3';
+        $tempPath = "temp-audio/{$uuid}.{$extension}";
+        if (Storage::exists($tempPath)) {
+            Storage::delete($tempPath);
+        }
         if (Storage::exists($this->rutaArchivo)) {
             Storage::delete($this->rutaArchivo);
         }
