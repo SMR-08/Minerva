@@ -66,6 +66,7 @@ jobs:
           sed -i 's/DB_USERNAME=.*/DB_USERNAME=minerva/' .env
           sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=minerva_secret/' .env
           sed -i 's/QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
+          sed -i 's/SESSION_DRIVER=.*/SESSION_DRIVER=file/' .env
 
       - name: Ejecutar migraciones
         working-directory: ./Backend
@@ -139,6 +140,7 @@ jobs:
           sed -i 's/APP_ENV=.*/APP_ENV=testing/' .env
           sed -i 's/APP_DEBUG=.*/APP_DEBUG=true/' .env
           sed -i 's/QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
+          sed -i 's/SESSION_DRIVER=.*/SESSION_DRIVER=file/' .env
 
       - name: Ejecutar migraciones y seed
         working-directory: ./Backend

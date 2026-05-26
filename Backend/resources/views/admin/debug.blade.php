@@ -14,7 +14,7 @@
                 <div class="p-4 rounded-lg space-y-3" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium" style="color: #666666;">Endpoint:</span>
-                        <code class="text-xs px-2 py-1 rounded" style="background: #F3FAFF; color: #3B82F6; border: 1px solid #E5E7EB;">{{ config('audio.ia.upload_url') }}</code>
+                        <code class="text-xs px-2 py-1 rounded" style="background: #F3FAFF; color: #3B82F6; border: 1px solid #E5E7EB;">{{ config('audio.ia.upload_url', 'No configurada') }}</code>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium" style="color: #666666;">Estado:</span>
