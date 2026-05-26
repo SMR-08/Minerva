@@ -1,0 +1,36 @@
+# ==============================================================================
+# Minerva Resumidor — Dockerfile
+# ==============================================================================
+# Modelo: Qwen3.5-0.8B (configurable via SUMMARY_MODEL)
+# Base: NVIDIA CUDA runtime (necesario para torch con GPU)
+# Uso: DEV=0 make ia-up (construye localmente en UMA, NO sube a GHCR)
+# ==============================================================================
+
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+WORKDIR /app
+
+# Dependencias de sistema
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 python3-pip curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Dependencias Python
+RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cu124 && \
+    pip install --no-cache-dir \
+    transformers \
+    accelerate \
+    fastapi \
+    "uvicorn[standard]"
+
+# Código
+COPY main.py /app/main.py
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
+    CMD curl -f http://localhost:8000/estado || exit 1
+
+# El modelo se descarga al primer arranque y se cachea en el volumen
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
