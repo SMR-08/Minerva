@@ -8,6 +8,7 @@ import { MinervaService, Transcripcion } from '../minerva.service';
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
 import { ModalComponent } from '../modal/modal.component';
+import { MarkdownPipe } from '../pipes/markdown.pipe';
 
 interface Segmento {
   hablante: string;
@@ -18,7 +19,7 @@ interface Segmento {
 @Component({
   selector: 'app-transcripcion-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ModalComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, MarkdownPipe],
   templateUrl: './transcripcion-view.component.html',
   styleUrl: './transcripcion-view.component.css'
 })

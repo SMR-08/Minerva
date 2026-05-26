@@ -66,6 +66,12 @@
           <p>Esta transcripción está en estado {{ estadoTranscripcion() }}. Los datos se mostrarán cuando esté completada.</p>
         </div>
       }
+      @if (estadoTranscripcion() === 'RESUMIENDO') {
+        <div class="estado-alerta pendiente">
+          <h3>Generando resumen</h3>
+          <p>La transcripción está completa. Generando resumen con IA...</p>
+        </div>
+      }
 
       <!-- Content grid -->
       <div class="trans-content-grid">
@@ -156,7 +162,7 @@
               Resumen
             </h2>
             @if (transcripcion()?.resumen_ia) {
-              <div class="summary-content" [innerHTML]="transcripcion()?.resumen_ia"></div>
+              <div class="summary-content" [innerHTML]="transcripcion()?.resumen_ia | markdown"></div>
             } @else {
               <div class="no-data">
                 <p>No hay resumen disponible para esta transcripción.</p>
