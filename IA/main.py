@@ -44,8 +44,7 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://:minerva_dev_redis@minerva-redi
 LARAVEL_URL = os.environ.get("LARAVEL_URL", "http://minerva-nginx:80")
 CALLBACK_SECRET = os.environ.get("IA_CALLBACK_SECRET", "cambiar")
 URL_DIARIZADOR = os.environ.get("URL_DIARIZADOR", "http://minerva-diarizador:8000")
-RUTA_TEMPORAL = os.environ.get("RUTA_TEMPORAL", "/shared-audio")
-os.makedirs(RUTA_TEMPORAL, exist_ok=True)
+RUTA_TEMPORAL = os.environ.get("RUTA_TEMPORAL", "/tmp")
 
 GPU_MODE = os.environ.get("GPU_MODE", "compact")
 GPU_CONCURRENCY = int(os.environ.get("GPU_CONCURRENCY", "1"))
@@ -161,11 +160,13 @@ async def procesar_transcripcion(tarea: dict):
     metricas = {}
     inicio_total = time.time()
 
-    # 1. Descargar audio
-    await update_status(uuid, estado="PROCESANDO", progreso=5, etapa="DESCARGA")
-    ruta_audio = await descargar_audio(tarea)
+    # Notificar a Laravel que empezamos a procesar
+    await notificar_laravel(tarea.get("callback_url", ""), uuid, "PROCESANDO")
 
     try:
+        # 1. Descargar audio
+        await update_status(uuid, estado="PROCESANDO", progreso=5, etapa="DESCARGA")
+        ruta_audio = await descargar_audio(tarea)
         # 2. ASR
         await update_status(uuid, estado="PROCESANDO", progreso=10, etapa="ASR")
         modelo_asr = await gpu_manager.ensure_loaded("asr")
@@ -393,6 +394,10 @@ async def worker_loop():
             stats["failed"] += 1
             stats["current_task"] = None
             log.error("Error en worker loop", error=str(e))
+            # Notificar FALLIDO a Laravel y Redis
+            if uuid and uuid != "unknown":
+                await update_status(uuid, estado="FALLIDO", progreso=0)
+                await notificar_laravel(tarea.get("callback_url", ""), uuid, "FALLIDO", error=str(e))
             await asyncio.sleep(5)
 
 
