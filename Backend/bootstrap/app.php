@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'es_admin' => \App\Http\Middleware\EsAdmin::class,
         ]);
+
+        // Confiar en proxies (ALB de AWS envía X-Forwarded-*)
+        $middleware->trustProxies(at: '*');
         
         // Redirect unauthenticated users to admin login
         $middleware->redirectGuestsTo(fn () => route('admin.login'));
