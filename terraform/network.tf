@@ -76,12 +76,17 @@ resource "aws_security_group" "app" {
   }
 
   # Redis para servidor IA (cola unificada)
-  ingress {
-    description = "Redis desde IA"
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = var.ia_server_cidr
+  # Si enable_ia_gpu=true, se usa la IP de la instancia GPU creada aquí.
+  # Si no, se usa ia_server_cidr (IP externa manual).
+  dynamic "ingress" {
+    for_each = length(local.ia_cidr_blocks) > 0 ? [1] : []
+    content {
+      description = "Redis desde IA"
+      from_port   = 6379
+      to_port     = 6379
+      protocol    = "tcp"
+      cidr_blocks = local.ia_cidr_blocks
+    }
   }
 
   egress {
