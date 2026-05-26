@@ -8,6 +8,7 @@ use App\Http\Controllers\TemaController;
 use App\Http\Controllers\ProcesamientoAudioController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\SseController;
+use App\Http\Controllers\AudioDownloadController;
 
 // Rutas públicas
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:30,1');
@@ -16,6 +17,9 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:30
 // Callbacks de IA (autenticados con secret propio, no con Sanctum)
 Route::post('ia/callback', [ProcesamientoAudioController::class, 'procesarCallback'])->name('ia.callback')->middleware('throttle:30,1');
 Route::post('ia/sse-update', [SseController::class, 'sseUpdate'])->middleware('throttle:30,1');
+
+// Descarga de audio para IA (autenticado con IA_CALLBACK_SECRET)
+Route::get('internal/audio-download/{uuid}', [AudioDownloadController::class, 'download'])->middleware('throttle:10,1');
 
 // SSE público (autenticación vía query param para EventSource)
 Route::get('transcripciones/{uuid}/estado', [SseController::class, 'estado'])->middleware('throttle:60,1');
