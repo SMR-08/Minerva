@@ -1,0 +1,80 @@
+# ==============================================================================
+# Desplegar Minerva — Despliegue a instancia AWS
+# ==============================================================================
+# Solo pull + up. La infra (Terraform) se gestiona aparte.
+# Trigger: manual (workflow_dispatch) — las creds del Lab expiran cada 4h.
+#
+# Secrets necesarios:
+#   SSH_PRIVATE_KEY  — Contenido de labsuser.pem (key pair vockey)
+#   ENV_PRODUCTION   — Contenido del .env de produccion
+#
+# Opcionales (si se quiere obtener IP automaticamente):
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+# ==============================================================================
+
+name: Desplegar Minerva
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_ip:
+        description: 'IP de la instancia (dejar vacio para auto-detectar via AWS)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    name: Desplegar (pull + up)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determinar IP de la instancia
+        id: ip
+        run: |
+          if [ -n "${{ inputs.instance_ip }}" ]; then
+            echo "ip=${{ inputs.instance_ip }}" >> $GITHUB_OUTPUT
+          else
+            pip install awscli -q
+            IP=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=minerva-app" \
+                        "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text)
+            echo "ip=$IP" >> $GITHUB_OUTPUT
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_DEFAULT_REGION: us-east-1
+
+      - name: Preparar conexion SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/key
+          chmod 600 /tmp/key
+          echo "Conectando a ${{ steps.ip.outputs.ip }}..."
+
+      - name: Inyectar configuracion y desplegar
+        env:
+          VM_IP: ${{ steps.ip.outputs.ip }}
+        run: |
+          # Inyectar .env de produccion
+          echo "${{ secrets.ENV_PRODUCTION }}" | ssh -i /tmp/key \
+            -o StrictHostKeyChecking=no ubuntu@$VM_IP "cat > /home/ubuntu/Minerva/.env"
+
+          # Descargar imagenes y desplegar
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@$VM_IP << 'ENDSSH'
+            cd /home/ubuntu/Minerva
+            git pull origin main
+            docker compose -f docker-compose.production.yml pull 2>/dev/null || true
+            DEV=0 make init
+          ENDSSH
+
+      - name: Verificar despliegue
+        run: |
+          sleep 10
+          ssh -i /tmp/key -o StrictHostKeyChecking=no ubuntu@${{ steps.ip.outputs.ip }} \
+            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'Up|NAME'"
+          rm -f /tmp/key

@@ -13,7 +13,7 @@ services:
     build:
       context: ./nginx-gateway
       dockerfile: Dockerfile
-    image: minerva-nginx-gateway:production
+    image: ${IMAGE_REGISTRY:-}minerva-gateway:${IMAGE_TAG:-production}
     container_name: minerva-gateway
     restart: always
     ports:
@@ -47,7 +47,7 @@ services:
     build:
       context: ./Frontend
       dockerfile: Dockerfile.production
-    image: minerva-frontend:production
+    image: ${IMAGE_REGISTRY:-}minerva-frontend:${IMAGE_TAG:-production}
     container_name: minerva-frontend
     restart: always
     networks:
@@ -83,7 +83,7 @@ services:
       args:
         user: ${WWWUSER:-minerva}
         uid: ${WWWUSER_ID:-1000}
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-app
     restart: always
     working_dir: /var/www
@@ -191,7 +191,7 @@ services:
   # ============================================================================
   laravel-worker:
     profiles: ["back"]
-    image: minerva-backend-app:production
+    image: ${IMAGE_REGISTRY:-}minerva-backend:${IMAGE_TAG:-production}
     container_name: minerva-worker
     restart: always
     working_dir: /var/www

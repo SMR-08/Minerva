@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend-tests:
-    name: Laravel Tests (Pest)
+    name: Tests Backend (Pest)
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -32,24 +32,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Configurar PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo_mysql, bcmath
           coverage: none
 
-      - name: Install Backend Dependencies
+      - name: Instalar dependencias Backend
         working-directory: ./Backend
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Generate APP_KEY
+      - name: Generar APP_KEY
         working-directory: ./Backend
         run: |
           cp .env.example .env
           php artisan key:generate
 
-      - name: Configure Environment
+      - name: Configurar entorno
         working-directory: ./Backend
         env:
           DB_CONNECTION: mysql
@@ -67,16 +67,16 @@ jobs:
           sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=minerva_secret/' .env
           sed -i 's/QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
 
-      - name: Run Migrations
+      - name: Ejecutar migraciones
         working-directory: ./Backend
         run: php artisan migrate --force
 
-      - name: Run Pest Tests
+      - name: Ejecutar tests Pest
         working-directory: ./Backend
         run: ./vendor/bin/pest tests/Arch.php tests/Feature tests/Unit --colors=always
 
   e2e-tests:
-    name: E2E Tests (Playwright)
+    name: Tests E2E (Playwright)
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -100,32 +100,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Configurar PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo_mysql, bcmath
 
-      - name: Setup Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Install Backend Dependencies
+      - name: Instalar dependencias Backend
         working-directory: ./Backend
         run: composer install --no-interaction --prefer-dist
 
-      - name: Install Frontend Dependencies
+      - name: Instalar dependencias Frontend
         working-directory: ./Frontend
         run: npm install
 
-      - name: Install Playwright Dependencies
+      - name: Instalar Playwright
         working-directory: ./e2e
         run: |
           npm install
           npx playwright install --with-deps chromium
 
-      - name: Configure Backend
+      - name: Configurar Backend
         working-directory: ./Backend
         run: |
           cp .env.example .env
@@ -140,38 +140,38 @@ jobs:
           sed -i 's/APP_DEBUG=.*/APP_DEBUG=true/' .env
           sed -i 's/QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
 
-      - name: Run Migrations and Seed
+      - name: Ejecutar migraciones y seed
         working-directory: ./Backend
         run: |
           php artisan migrate --force
           php artisan db:seed --force
 
-      - name: Start Laravel Server
+      - name: Iniciar servidor Laravel
         working-directory: ./Backend
         run: php artisan serve --host=127.0.0.1 --port=8001 &
 
-      - name: Build and Start Frontend
+      - name: Compilar e iniciar Frontend
         working-directory: ./Frontend
         run: npx ng serve --host 127.0.0.1 --port 4200 --poll 2000 &
 
-      - name: Wait for Services
+      - name: Esperar servicios
         run: |
-          echo "Waiting for backend..."
+          echo "Esperando backend..."
           for i in $(seq 1 30); do
             curl -s http://127.0.0.1:8001 > /dev/null && break
             sleep 2
           done
-          echo "Waiting for frontend..."
+          echo "Esperando frontend..."
           for i in $(seq 1 60); do
             curl -s http://127.0.0.1:4200 > /dev/null && break
             sleep 2
           done
 
-      - name: Run Playwright Tests
+      - name: Ejecutar tests Playwright
         working-directory: ./e2e
         run: npx playwright test --reporter=list
 
-      - name: Upload Playwright Report
+      - name: Subir informe Playwright
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -179,7 +179,7 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 30
 
-      - name: Upload Test Videos
+      - name: Subir videos de tests fallidos
         if: failure()
         uses: actions/upload-artifact@v4
         with:
