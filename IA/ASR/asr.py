@@ -31,6 +31,24 @@ MAPA_IDIOMAS = {
 }
 
 
+def cargar_modelo():
+    """Carga el modelo ASR en GPU y lo devuelve. Usado por GPUModelManager."""
+    print(f"Cargando modelo {MODELO_ASR} en {DISPOSITIVO}...")
+    modelo = Qwen3ASRModel.from_pretrained(
+        MODELO_ASR,
+        dtype=torch.bfloat16,
+        device_map=DISPOSITIVO,
+        forced_aligner=MODELO_ALIGNER,
+        forced_aligner_kwargs=dict(
+            dtype=torch.bfloat16,
+            device_map=DISPOSITIVO,
+        ),
+        max_inference_batch_size=32,
+        max_new_tokens=4096,
+    )
+    return modelo
+
+
 def transcribir_audio(
     nombre_archivo: str,
     idioma: str = None,
