@@ -9,6 +9,7 @@ import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
 import { ModalComponent } from '../modal/modal.component';
 import { MarkdownPipe } from '../pipes/markdown.pipe';
+import { HeaderComponent } from '../layout/header/header.component';
 
 interface Segmento {
   hablante: string;
@@ -19,14 +20,13 @@ interface Segmento {
 @Component({
   selector: 'app-transcripcion-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, MarkdownPipe],
+  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, MarkdownPipe, HeaderComponent],
   templateUrl: './transcripcion-view.component.html',
   styleUrl: './transcripcion-view.component.css'
 })
 export class TranscripcionViewComponent implements OnInit, OnDestroy {
   transcripcion = signal<Transcripcion | null>(null);
   segmentos = signal<Segmento[]>([]);
-  userMenuOpen = false;
   hablanateActivo = signal<string>('Todos');
   estadoTranscripcion = signal<string>('');
   errorMensaje = signal<string>('');
@@ -186,12 +186,5 @@ export class TranscripcionViewComponent implements OnInit, OnDestroy {
 
   getIdAsignatura(): number | null {
     return this.transcripcion()?.tema?.asignatura?.id_asignatura || null;
-  }
-
-  toggleUserMenu(): void { this.userMenuOpen = !this.userMenuOpen; }
-
-  cerrarSesion(): void {
-    this.authService.logout();
-    this.router.navigate(['/login']);
   }
 }
