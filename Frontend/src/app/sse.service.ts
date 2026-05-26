@@ -46,7 +46,7 @@ export class SseService {
         );
         onEvent(response);
 
-        if (response.estado === 'COMPLETADO' || response.estado === 'FALLIDO') {
+        if (response.estado === 'LISTO' || response.estado === 'FALLIDO') {
           clearInterval(intervalId);
           onComplete?.();
         }
