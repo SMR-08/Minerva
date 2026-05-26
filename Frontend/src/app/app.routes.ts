@@ -6,6 +6,7 @@ import { AsignaturaViewComponent } from './asignatura-view/asignatura-view.compo
 import { TranscripcionViewComponent } from './transcripcion-view/transcripcion-view.component';
 import { FormularioLoginComponent } from './formulario-login/formulario-login.component';
 import { LandingPageComponent } from './landing-page/landing-page.component';
+import { AjustesComponent } from './ajustes/ajustes.component';
 import { AuthGuard } from './auth.guard';
 
 export const routes: Routes = [
@@ -16,5 +17,6 @@ export const routes: Routes = [
   { path: 'asignatura/:id', component: AsignaturaViewComponent, canActivate: [AuthGuard] },
   { path: 'transcripcion/:id', component: TranscripcionViewComponent, canActivate: [AuthGuard] },
   { path: 'subir', component: FormularioSubidaComponent, canActivate: [AuthGuard] },
+  { path: 'ajustes', component: AjustesComponent, canActivate: [AuthGuard] },
   { path: '**', redirectTo: '/', pathMatch: 'full' }
 ];

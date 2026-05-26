@@ -1,28 +1,7 @@
 <div class="transcripcion-page">
   <div class="dashboard-bg-pattern"></div>
 
-  <!-- Header -->
-  <header class="dash-header">
-    <div class="header-inner">
-      <div class="logo">
-        <a routerLink="/dashboard" class="logo-link">
-          <img src="assets/images/minerva-seal-logo.png" alt="Minerva" class="logo-img" />
-          <span class="logo-text">MINERVA</span>
-        </a>
-      </div>
-      <div class="header-actions">
-        <div class="user-avatar" (click)="toggleUserMenu()" [class.active]="userMenuOpen">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-          <div class="user-menu" *ngIf="userMenuOpen">
-            <a (click)="cerrarSesion()" class="menu-item">Cerrar sesión</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
+  <app-header></app-header>
 
   <!-- Main Content -->
   <main class="transcripcion-main">

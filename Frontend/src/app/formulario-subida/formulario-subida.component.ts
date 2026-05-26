@@ -8,11 +8,12 @@ import { MinervaService, Asignatura, Tema } from '../minerva.service';
 import { AuthService } from '../auth.service';
 import { SseService, SseEvent, PollingHandler } from '../sse.service';
 import { NotificationService } from '../notification.service';
+import { HeaderComponent } from '../layout/header/header.component';
 
 @Component({
   selector: 'app-formulario-subida',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, HeaderComponent],
   templateUrl: './formulario-subida.component.html',
   styleUrl: './formulario-subida.component.css'
 })
@@ -31,7 +32,6 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
   error: boolean = false;
   enviado: boolean = false;
   cargando: boolean = false;
-  userMenuOpen = false;
 
   estadoTranscripcion = signal<string>('');
   progreso = signal<number>(0);
@@ -253,15 +253,6 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
     this.etaSegundos.set(0);
     this.transcripcionUrl.set('');
     this.mensajeError.set('');
-  }
-
-  toggleUserMenu(): void {
-    this.userMenuOpen = !this.userMenuOpen;
-  }
-
-  cerrarSesion(): void {
-    this.authService.logout();
-    this.router.navigate(['/login']);
   }
 
   volverAtras(): void {
