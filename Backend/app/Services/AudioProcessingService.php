@@ -113,7 +113,7 @@ class AudioProcessingService
             $resultado = $payload['resultado'] ?? [];
             $transcripcion->update([
                 'estado' => 'PROCESANDO',
-                'progreso_porcentaje' => $resultado['progreso'] ?? null,
+                'progreso_porcentaje' => $resultado['progreso'] ?? 0,
                 'etapa_actual' => $resultado['etapa'] ?? null,
             ]);
         } elseif ($payload['estado'] === 'RESUMIENDO') {
