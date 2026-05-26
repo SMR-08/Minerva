@@ -47,3 +47,20 @@ output "app_url" {
   description = "URL de la aplicacion"
   value       = var.domain_name != "" ? "https://${var.domain_name}" : "http://${aws_lb.main.dns_name}"
 }
+
+# --- IA GPU outputs (solo si enable_ia_gpu=true) ---
+
+output "ia_gpu_ip" {
+  description = "IP pública de la instancia IA GPU"
+  value       = var.enable_ia_gpu ? aws_instance.ia[0].public_ip : "N/A (enable_ia_gpu=false)"
+}
+
+output "ia_gpu_ssh" {
+  description = "Comando SSH para la instancia IA"
+  value       = var.enable_ia_gpu ? "ssh -i ~/.ssh/labsuser.pem ubuntu@${aws_instance.ia[0].public_ip}" : "N/A"
+}
+
+output "ia_gpu_logs" {
+  description = "Ver logs de setup de la IA"
+  value       = var.enable_ia_gpu ? "ssh ubuntu@${aws_instance.ia[0].public_ip} 'tail -f /var/log/minerva-ia-setup.log'" : "N/A"
+}
