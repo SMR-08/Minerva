@@ -172,7 +172,7 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
       token,
       (event: SseEvent) => this.manejarEventoSSE(event),
       () => {
-        if (this.estadoTranscripcion() !== 'COMPLETADO' && this.estadoTranscripcion() !== 'FALLIDO') {
+        if (this.estadoTranscripcion() !== 'LISTO' && this.estadoTranscripcion() !== 'FALLIDO') {
           this.mensaje = 'Conexión perdida. Recarga la página para ver el estado.';
         }
       }
@@ -198,8 +198,20 @@ export class FormularioSubidaComponent implements OnInit, OnDestroy {
         break;
 
       case 'COMPLETADO':
+        this.cargando = true;
+        this.mensaje = 'Transcripción completada. Generando resumen...';
+        this.progreso.set(95);
+        break;
+
+      case 'RESUMIENDO':
+        this.cargando = true;
+        this.mensaje = 'Generando resumen con IA...';
+        this.progreso.set(97);
+        break;
+
+      case 'LISTO':
         this.cargando = false;
-        this.mensaje = '¡Transcripción completada!';
+        this.mensaje = '¡Transcripción y resumen completados!';
         this.progreso.set(100);
         this.transcripcionUrl.set(event.url || '');
         setTimeout(() => {
