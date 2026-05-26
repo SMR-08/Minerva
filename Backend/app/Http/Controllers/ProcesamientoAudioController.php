@@ -98,8 +98,8 @@ class ProcesamientoAudioController extends Controller
         $request->validate([
             'uuid' => 'required|string|exists:transcripciones,uuid_referencia',
             'estado' => 'required|in:PROCESANDO,COMPLETADO,FALLIDO,RESUMIENDO,LISTO',
-            'resultado' => 'required_if:estado,COMPLETADO|array',
-            'error' => 'required_if:estado,FALLIDO|string',
+            'resultado' => ['nullable', 'array', 'required_if:estado,COMPLETADO'],
+            'error' => ['nullable', 'string', 'required_if:estado,FALLIDO'],
             'resumen' => 'nullable|string',
         ]);
 
