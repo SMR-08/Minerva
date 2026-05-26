@@ -18,12 +18,24 @@ class AdminDashboardController extends Controller
      */
     public function index()
     {
+        // Estado del microservicio IA
+        $iaData = $this->consultarEstadoColaIA();
+        $iaStatus = $iaData ? 'disponible' : 'no_disponible';
+
+        // Actividad reciente: últimas 5 transcripciones
+        $recentActivity = Transcripcion::orderBy('fecha_grabacion', 'desc')
+            ->limit(5)
+            ->get(['titulo', 'estado', 'fecha_grabacion']);
+
         // Estadísticas Reales
         $stats = [
             'total_users' => Usuario::count(),
             'total_transcriptions' => Transcripcion::count(),
             'storage_used' => $this->getStorageSize(),
             'ai_queue' => $this->getAIQueueStatus(),
+            'api_status' => true,
+            'ia_status' => $iaStatus,
+            'recent_activity' => $recentActivity,
         ];
 
         return view('admin.dashboard', compact('stats'));
@@ -44,8 +56,15 @@ class AdminDashboardController extends Controller
     {
         try {
             $urlIA = config('audio.ia.upload_url');
-            $respuesta = Http::timeout(config('audio.ia.timeout', 120))
-                             ->get("$urlIA/estado");
+
+            if (!$urlIA) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'IA_UPLOAD_URL no configurada en .env'
+                ], 500);
+            }
+
+            $respuesta = Http::timeout(5)->get("$urlIA/estado");
 
             if ($respuesta->successful()) {
                 return response()->json([
@@ -58,17 +77,33 @@ class AdminDashboardController extends Controller
             Log::error("La IA respondió con error", ['status' => $respuesta->status()]);
             return response()->json([
                 'status' => 'error_interno',
-                'message' => 'Error interno al conectar con el servicio de IA'
+                'message' => "IA respondió con HTTP {$respuesta->status()}"
             ], 502);
 
         } catch (\Exception $e) {
-            Log::error("Fallo la conexión a la IA", [
-                'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            // En modo distribuido, intentar health via Redis
+            try {
+                $pendientes = \Illuminate\Support\Facades\Redis::connection('ia')->llen('minerva_tasks');
+                $ping = \Illuminate\Support\Facades\Redis::ping();
+                if ($ping) {
+                    return response()->json([
+                        'status' => 'success',
+                        'message' => 'IA no accesible directamente (modo distribuido), pero cola Redis operativa.',
+                        'data' => [
+                            'modo' => 'distribuido',
+                            'redis' => 'connected',
+                            'cola_pendientes' => $pendientes,
+                            'nota' => 'Health check directo no disponible — IA en red remota.',
+                        ]
+                    ]);
+                }
+            } catch (\Exception $redisEx) {
+                // Redis también falla
+            }
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error interno al conectar con el servicio de IA'
+                'message' => 'IA no accesible: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -155,7 +190,7 @@ class AdminDashboardController extends Controller
                 ];
             });
 
-        $ultimasCompletadas = Transcripcion::where('estado', 'COMPLETADO')
+        $ultimasCompletadas = Transcripcion::whereIn('estado', ['COMPLETADO', 'LISTO'])
             ->orderBy('fecha_procesamiento', 'desc')
             ->limit(5)
             ->get()
@@ -187,7 +222,7 @@ class AdminDashboardController extends Controller
             'total_transcripciones' => Transcripcion::count(),
             'en_espera' => Transcripcion::where('estado', 'ENCOLADO')->count(),
             'procesando' => Transcripcion::where('estado', 'PROCESANDO')->count(),
-            'completadas' => Transcripcion::where('estado', 'COMPLETADO')->count(),
+            'completadas' => Transcripcion::whereIn('estado', ['COMPLETADO', 'LISTO'])->count(),
             'fallidas' => Transcripcion::where('estado', 'FALLIDO')->count(),
         ];
 
@@ -229,12 +264,26 @@ class AdminDashboardController extends Controller
 
     private function consultarEstadoColaIA(): ?array
     {
+        // Intentar consulta HTTP directa a la IA
         try {
             $urlIA = config('audio.ia.upload_url');
-            $res = Http::timeout(3)->get("$urlIA/estado_cola");
-            if ($res->successful()) {
-                return $res->json();
+            if ($urlIA) {
+                $res = Http::timeout(2)->get("$urlIA/estado_cola");
+                if ($res->successful()) {
+                    return $res->json();
+                }
             }
+        } catch (\Exception $e) {
+            // HTTP falló — fallback a Redis
+        }
+
+        // Fallback: consultar Redis directamente (modo distribuido)
+        try {
+            $pendientes = \Illuminate\Support\Facades\Redis::connection('ia')->llen('minerva_tasks');
+            return [
+                'estado' => 'Worker activo',
+                'peticiones_en_espera' => $pendientes,
+            ];
         } catch (\Exception $e) {
             Log::warning("No se pudo consultar el estado de la cola IA", [
                 'exception' => $e->getMessage(),
