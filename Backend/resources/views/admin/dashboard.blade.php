@@ -74,10 +74,14 @@
                 </div>
                 <div class="flex items-center justify-between p-3 rounded-lg" style="background: #F9FCFF; border: 1px solid #E5E7EB;">
                     <div class="flex items-center gap-3">
-                        <div class="w-2 h-2 rounded-full" style="background: #10B981;"></div>
+                        <div class="w-2 h-2 rounded-full" style="background: {{ $stats['ia_status'] === 'disponible' ? '#10B981' : '#EF4444' }};"></div>
                         <span class="text-sm font-medium" style="color: #1a1a1a;">Microservicio IA</span>
                     </div>
-                    <span class="badge badge-success">Disponible</span>
+                    @if($stats['ia_status'] === 'disponible')
+                        <span class="badge badge-success">Disponible</span>
+                    @else
+                        <span class="badge badge-danger">No disponible</span>
+                    @endif
                 </div>
             </div>
         </div>
@@ -86,15 +90,19 @@
         <div class="card">
             <div class="card-header">Actividad Reciente</div>
             <div class="card-body space-y-3">
+                @forelse($stats['recent_activity'] as $activity)
                 <div class="flex items-center gap-3 p-3 rounded-lg" style="background: #F9FCFF;">
                     <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: #FFFFFF; border: 1px solid #E5E7EB;">
-                        <svg class="w-4 h-4" style="color: #666666;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <svg class="w-4 h-4" style="color: #666666;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium" style="color: #1a1a1a;">Sesión iniciada</p>
-                        <p class="text-xs" style="color: #999999;">hace 5 minutos - IP: 172.18.0.3</p>
+                        <p class="text-sm font-medium" style="color: #1a1a1a;">{{ $activity->titulo ?? 'Sin título' }}</p>
+                        <p class="text-xs" style="color: #999999;">{{ $activity->estado }} — {{ $activity->fecha_grabacion->diffForHumans() }}</p>
                     </div>
                 </div>
+                @empty
+                <p class="text-sm" style="color: #999999;">Sin actividad reciente.</p>
+                @endforelse
             </div>
         </div>
     </div>
