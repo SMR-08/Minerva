@@ -128,8 +128,8 @@
                 <h4 class="trans-title">{{ trans.titulo }}</h4>
                 <div class="trans-meta">
                   <span class="trans-date">{{ trans.fecha_procesamiento | date:'dd-MM-yy' }}</span>
-                  @if (trans.estado && trans.estado !== 'COMPLETADO') {
-                    <span class="trans-estado-badge" [class.estado-encolado]="trans.estado === 'ENCOLADO'" [class.estado-procesando]="trans.estado === 'PROCESANDO'" [class.estado-fallido]="trans.estado === 'FALLIDO'">
+                  @if (trans.estado && trans.estado !== 'COMPLETADO' && trans.estado !== 'LISTO') {
+                    <span class="trans-estado-badge" [class.estado-encolado]="trans.estado === 'ENCOLADO'" [class.estado-procesando]="trans.estado === 'PROCESANDO' || trans.estado === 'RESUMIENDO'" [class.estado-fallido]="trans.estado === 'FALLIDO'">
                       {{ trans.estado }}
                     </span>
                   } @else {
