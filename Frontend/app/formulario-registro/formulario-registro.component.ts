@@ -1,0 +1,101 @@
+import { Component, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import { AuthService } from '../auth.service';
+
+@Component({
+  selector: 'app-formulario-registro',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  templateUrl: './formulario-registro.component.html',
+  styleUrl: './formulario-registro.component.css'
+})
+export class FormularioRegistroComponent implements OnDestroy {
+  formulario = {
+    nombre: '',
+    email: '',
+    contrasena: '',
+    contrasenaConfirm: ''
+  };
+
+  mensaje: string = '';
+  error: boolean = false;
+  enviado: boolean = false;
+  mostrarContrasena: boolean = false;
+  mostrarContrasenaConfirm: boolean = false;
+
+  private destroy$ = new Subject<void>();
+
+  constructor(private authService: AuthService, private router: Router) {}
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  toggleMostrarContrasena(): void {
+    this.mostrarContrasena = !this.mostrarContrasena;
+  }
+
+  toggleMostrarContrasenaConfirm(): void {
+    this.mostrarContrasenaConfirm = !this.mostrarContrasenaConfirm;
+  }
+
+  onSubmit(): void {
+    this.enviado = true;
+
+    if (!this.formulario.nombre || !this.formulario.email || !this.formulario.contrasena || !this.formulario.contrasenaConfirm) {
+      this.mensaje = 'Por favor, completa todos los campos requeridos';
+      this.error = true;
+      return;
+    }
+
+    if (this.formulario.contrasena !== this.formulario.contrasenaConfirm) {
+      this.mensaje = 'Las contraseñas no coinciden';
+      this.error = true;
+      return;
+    }
+
+    if (this.formulario.contrasena.length < 8) {
+      this.mensaje = 'La contraseña debe tener al menos 8 caracteres';
+      this.error = true;
+      return;
+    }
+
+    const datosRegistro = {
+      nombre: this.formulario.nombre,
+      email: this.formulario.email,
+      contrasena: this.formulario.contrasena
+    };
+
+    this.authService.registerUser(datosRegistro).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => {
+        this.mensaje = 'Registro completado exitosamente. Ya puedes iniciar sesión.';
+        this.error = false;
+        this.onLimpiar();
+        setTimeout(() => this.router.navigate(['/login']), 1500);
+      },
+      error: (err) => {
+        console.error('Error registro:', err);
+        const primerError = err.error?.errors ? Object.values(err.error.errors)[0] : err.error?.message;
+        this.mensaje = primerError || 'Error al registrarse. Inténtalo de nuevo.';
+        this.error = true;
+      }
+    });
+  }
+
+  onLimpiar(): void {
+    this.formulario = {
+      nombre: '',
+      email: '',
+      contrasena: '',
+      contrasenaConfirm: ''
+    };
+    this.mensaje = '';
+    this.error = false;
+    this.enviado = false;
+  }
+}
