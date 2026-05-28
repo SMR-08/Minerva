@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Usuario;
-use Laravel\Sanctum\Sanctum;
 
 /*
 |--------------------------------------------------------------------------
@@ -182,7 +181,7 @@ test('logout cierra sesión correctamente', function () {
     $token = $usuario->createToken('test-token')->plainTextToken;
 
     $response = $this->postJson('/api/logout', [], [
-        'Authorization' => 'Bearer ' . $token,
+        'Authorization' => 'Bearer '.$token,
     ]);
 
     $response->assertStatus(200)
@@ -209,7 +208,7 @@ test('obtener información del usuario autenticado', function () {
     $token = $usuario->createToken('test-token')->plainTextToken;
 
     $response = $this->getJson('/api/user', [
-        'Authorization' => 'Bearer ' . $token,
+        'Authorization' => 'Bearer '.$token,
     ]);
 
     $response->assertStatus(200)
@@ -223,4 +222,112 @@ test('obtener usuario falla sin autenticación', function () {
     $response = $this->getJson('/api/user');
 
     $response->assertStatus(401);
+});
+
+// ==================== AJUSTES DE USUARIO ====================
+
+test('usuario puede actualizar su perfil', function () {
+    $usuario = Usuario::factory()->create([
+        'email' => 'perfil@prueba.com',
+        'nombre_completo' => 'Nombre Original',
+    ]);
+
+    $response = $this->patchJson('/api/user/profile', [
+        'nombre_completo' => 'Nombre Actualizado',
+        'email' => 'actualizado@prueba.com',
+    ], authHeaders($usuario));
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'message' => 'Perfil actualizado correctamente',
+            'usuario' => [
+                'nombre' => 'Nombre Actualizado',
+                'email' => 'actualizado@prueba.com',
+            ],
+        ]);
+
+    $this->assertDatabaseHas('usuarios', [
+        'id_usuario' => $usuario->id_usuario,
+        'nombre_completo' => 'Nombre Actualizado',
+        'email' => 'actualizado@prueba.com',
+    ]);
+});
+
+test('actualizar perfil valida email único excepto el propio', function () {
+    Usuario::factory()->create(['email' => 'ocupado@prueba.com']);
+    $usuario = Usuario::factory()->create(['email' => 'propio@prueba.com']);
+
+    $response = $this->patchJson('/api/user/profile', [
+        'nombre_completo' => 'Nombre Actualizado',
+        'email' => 'ocupado@prueba.com',
+    ], authHeaders($usuario));
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['email']);
+
+    $response = $this->patchJson('/api/user/profile', [
+        'nombre_completo' => 'Nombre Actualizado',
+        'email' => 'propio@prueba.com',
+    ], authHeaders($usuario));
+
+    $response->assertStatus(200)
+        ->assertJsonPath('usuario.email', 'propio@prueba.com');
+});
+
+test('usuario puede cambiar su contraseña', function () {
+    $usuario = Usuario::factory()->create([
+        'password_hash' => bcrypt('password-actual'),
+    ]);
+
+    $response = $this->patchJson('/api/user/password', [
+        'password_actual' => 'password-actual',
+        'password_nuevo' => 'password-nuevo',
+        'password_nuevo_confirmation' => 'password-nuevo',
+    ], authHeaders($usuario));
+
+    $response->assertStatus(200)
+        ->assertJson(['message' => 'Contraseña actualizada correctamente']);
+
+    $usuario->refresh();
+    expect(\Illuminate\Support\Facades\Hash::check('password-nuevo', $usuario->password_hash))->toBeTrue();
+});
+
+test('cambiar contraseña falla si la contraseña actual no coincide', function () {
+    $usuario = Usuario::factory()->create([
+        'password_hash' => bcrypt('password-actual'),
+    ]);
+
+    $response = $this->patchJson('/api/user/password', [
+        'password_actual' => 'incorrecta',
+        'password_nuevo' => 'password-nuevo',
+        'password_nuevo_confirmation' => 'password-nuevo',
+    ], authHeaders($usuario));
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['password_actual']);
+});
+
+test('usuario puede eliminar su cuenta', function () {
+    $usuario = Usuario::factory()->create([
+        'email' => 'borrar@prueba.com',
+    ]);
+    $token = $usuario->createToken('test-token')->plainTextToken;
+
+    $response = $this->deleteJson('/api/user', [], [
+        'Authorization' => 'Bearer '.$token,
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJson(['message' => 'Cuenta eliminada correctamente']);
+
+    $this->assertDatabaseMissing('usuarios', [
+        'id_usuario' => $usuario->id_usuario,
+    ]);
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+});
+
+test('rutas de ajustes requieren autenticación', function () {
+    $this->patchJson('/api/user/profile')->assertStatus(401);
+    $this->patchJson('/api/user/password')->assertStatus(401);
+    $this->deleteJson('/api/user')->assertStatus(401);
 });
