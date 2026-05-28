@@ -117,4 +117,20 @@ export class MinervaService {
   verificarEstadoIA(): Observable<any> {
     return this.http.get(`${this.apiUrl}/ia/estado`);
   }
+
+  // Métodos de gestión de usuario
+  actualizarPerfil(nombre: string, email: string): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/user/profile`, { nombre: nombre, email: email });
+  }
+
+  cambiarContrasena(password_actual: string, password_nueva: string): Observable<any> {
+    return this.http.patch(`${this.apiUrl}/user/password`, {
+      password_actual: password_actual,
+      password_nueva: password_nueva
+    });
+  }
+
+  eliminarCuenta(): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/user`);
+  }
 }
