@@ -46,10 +46,27 @@ export class AjustesComponent implements OnInit {
       this.router.navigate(['/login']);
       return;
     }
-    this.email = user.usuario;
-    this.nombre = user.usuario.split('@')[0];
-    this.emailNuevo = user.usuario;
-    this.nombreNuevo = user.usuario.split('@')[0];
+    
+    // Cargar datos reales del usuario desde la API
+    this.cargando = true;
+    this.minervaService.obtenerUsuario().subscribe({
+      next: (userData: any) => {
+        this.cargando = false;
+        this.nombre = userData.nombre || user.usuario.split('@')[0];
+        this.email = userData.email || user.usuario;
+        this.nombreNuevo = this.nombre;
+        this.emailNuevo = this.email;
+      },
+      error: (error: any) => {
+        this.cargando = false;
+        // Fallback a valores del localStorage si falla la API
+        this.email = user.usuario;
+        this.nombre = user.usuario.split('@')[0];
+        this.emailNuevo = user.usuario;
+        this.nombreNuevo = user.usuario.split('@')[0];
+        console.error('Error al cargar datos del usuario:', error);
+      }
+    });
   }
 
   setTab(tab: 'perfil' | 'seguridad' | 'cuenta'): void {
@@ -66,19 +83,19 @@ export class AjustesComponent implements OnInit {
 
   guardarPerfil(): void {
     // Validaciones
-    if (!this.nombre.trim()) {
+    if (!this.nombreNuevo.trim()) {
       this.notificationService.error('El nombre no puede estar vacío.');
       return;
     }
 
-    if (!this.email.trim()) {
+    if (!this.emailNuevo.trim()) {
       this.notificationService.error('El correo electrónico no puede estar vacío.');
       return;
     }
 
     // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(this.email)) {
+    if (!emailRegex.test(this.emailNuevo)) {
       this.notificationService.error('Ingresa un correo electrónico válido.');
       return;
     }
@@ -86,12 +103,21 @@ export class AjustesComponent implements OnInit {
     this.cargando = true;
     this.mensaje = null;
 
-    this.minervaService.actualizarPerfil(this.nombre, this.email).subscribe({
+    this.minervaService.actualizarPerfil(this.nombreNuevo, this.emailNuevo).subscribe({
       next: (res: any) => {
         this.cargando = false;
         this.notificationService.success('Perfil actualizado correctamente.');
-        this.email = this.emailNuevo;
         this.nombre = this.nombreNuevo;
+        this.email = this.emailNuevo;
+        
+        // Actualizar localStorage si cambió el email
+        if (this.emailNuevo !== this.authService.getUser()?.usuario) {
+          const currentSession = this.authService.getUser();
+          if (currentSession) {
+            const updatedSession = { usuario: this.emailNuevo, token: currentSession.token, timestamp: Date.now() };
+            localStorage.setItem('auth_session', JSON.stringify(updatedSession));
+          }
+        }
       },
       error: (error: any) => {
         this.cargando = false;

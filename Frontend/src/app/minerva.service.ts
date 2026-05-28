@@ -119,14 +119,19 @@ export class MinervaService {
   }
 
   // Métodos de gestión de usuario
+  obtenerUsuario(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/user`);
+  }
+
   actualizarPerfil(nombre: string, email: string): Observable<any> {
-    return this.http.patch(`${this.apiUrl}/user/profile`, { nombre: nombre, email: email });
+    return this.http.patch(`${this.apiUrl}/user/profile`, { nombre_completo: nombre, email: email });
   }
 
   cambiarContrasena(password_actual: string, password_nueva: string): Observable<any> {
     return this.http.patch(`${this.apiUrl}/user/password`, {
       password_actual: password_actual,
-      password_nueva: password_nueva
+      password_nuevo: password_nueva,
+      password_nuevo_confirmation: password_nueva
     });
   }
 
