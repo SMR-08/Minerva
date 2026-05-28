@@ -320,27 +320,27 @@ health: ## Verificar conectividad entre servicios
 # ==============================================================================
 front-up: ## Levantar solo Frontend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front up -d; \
-	else $(DC) up -d minerva-frontend; fi
+	else $(DC) up -d laravel-web; fi
 
 front-down: ## Bajar solo Frontend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front stop; \
-	else $(DC) stop minerva-frontend; fi
+	else $(DC) stop laravel-web; fi
 
 front-logs: ## Logs del Frontend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile front logs -f; \
-	else $(DC) logs -f minerva-frontend; fi
+	else $(DC) logs -f laravel-web; fi
 
 back-up: ## Levantar solo Backend (app + db + redis + worker)
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back up -d; \
-	else $(DC) up -d laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
+	else $(DC) up -d laravel-app laravel-web minerva-db minerva-redis laravel-worker; fi
 
 back-down: ## Bajar solo Backend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back stop; \
-	else $(DC) stop laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
+	else $(DC) stop laravel-app laravel-web minerva-db minerva-redis laravel-worker; fi
 
 back-logs: ## Logs del Backend
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile back logs -f; \
-	else $(DC) logs -f laravel-app minerva-nginx minerva-db minerva-redis laravel-worker; fi
+	else $(DC) logs -f laravel-app laravel-web minerva-db minerva-redis laravel-worker; fi
 
 ia-up: ## Levantar solo IA (ASR + Diarizador + Resumidor)
 	@if [ "$(DEV)" = "0" ]; then $(DC) --profile ia up -d; \

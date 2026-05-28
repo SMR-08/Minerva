@@ -8,11 +8,13 @@ import { MinervaService, Asignatura, Transcripcion, Tema } from '../minerva.serv
 import { AuthService } from '../auth.service';
 import { NotificationService } from '../notification.service';
 import { ModalComponent } from '../modal/modal.component';
+import { HeaderComponent } from '../layout/header/header.component';
+import { FooterComponent } from '../layout/footer/footer.component';
 
 @Component({
   selector: 'app-asignatura-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ModalComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, HeaderComponent, FooterComponent],
   templateUrl: './asignatura-view.component.html',
   styleUrl: './asignatura-view.component.css'
 })

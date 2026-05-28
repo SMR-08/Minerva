@@ -20,8 +20,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Confiar en proxies (ALB de AWS envía X-Forwarded-*)
         $middleware->trustProxies(at: '*');
         
-        // Redirect unauthenticated users to admin login
-        $middleware->redirectGuestsTo(fn () => route('admin.login'));
+        // Redirect unauthenticated users to admin login (solo para rutas web, no API)
+        $middleware->redirectGuestsTo(function ($request) {
+            if ($request->is('api/*')) {
+                return null; // No redirigir peticiones API, dejar que devuelvan 401
+            }
+            return route('admin.login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

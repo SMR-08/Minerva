@@ -10,6 +10,7 @@ import { NotificationService } from '../notification.service';
 import { ModalComponent } from '../modal/modal.component';
 import { MarkdownPipe } from '../pipes/markdown.pipe';
 import { HeaderComponent } from '../layout/header/header.component';
+import { FooterComponent } from '../layout/footer/footer.component';
 
 interface Segmento {
   hablante: string;
@@ -20,7 +21,7 @@ interface Segmento {
 @Component({
   selector: 'app-transcripcion-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, MarkdownPipe, HeaderComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ModalComponent, MarkdownPipe, HeaderComponent, FooterComponent],
   templateUrl: './transcripcion-view.component.html',
   styleUrl: './transcripcion-view.component.css'
 })

@@ -295,6 +295,14 @@ Durante PROCESANDO, se actualizan `progreso_porcentaje` (0-100) y `etapa_actual`
 | Tags | GET/POST/DELETE `/api/tags` | Bearer | User-scoped |
 | Transcripciones | GET/PUT/DELETE `/api/transcripciones/{id}` | Bearer | Incluye texto diarizado |
 
+### Gestión de Usuario
+
+| Endpoint | Método | Auth | Descripción |
+|----------|--------|------|-------------|
+| `/api/user/profile` | PATCH | Bearer | Actualizar nombre y email del usuario |
+| `/api/user/password` | PATCH | Bearer | Cambiar contraseña (requiere password_actual + password_nueva) |
+| `/api/user` | DELETE | Bearer | Eliminar cuenta del usuario (acción irreversible) |
+
 ### Procesamiento de Audio
 
 | Endpoint | Método | Auth | Descripción |
