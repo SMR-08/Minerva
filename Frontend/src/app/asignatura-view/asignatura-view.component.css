@@ -144,34 +144,27 @@
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 40px;
-  justify-content: space-between;
 }
 
 /* ===== CREATE NEW CARD ===== */
-.subject-card-new {  
-  margin-left: auto;
-  width: 145px;
-  align-self: center;
-  display: flex;
-  font-family: var(--font-sans);
-  font-size: .95rem;
-  font-weight: 600;
-  color: var(--primary);
-  background: #fff;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  text-decoration: none;
-  box-shadow: 0 2px 8px #0003;
-  transition: all .2s;
-  letter-spacing: .02em;
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 7px;
+.subject-card-new {
+  background: transparent;
+  border: 2px dashed var(--border);
+  box-shadow: none;
   align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 28px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
 }
 
-.subject-card-new:hover { border: 2px solid var(--primary); background: rgba(74, 107, 138, 0.03); transform: translateY(-1px); }
+.subject-card-new:hover { border-color: var(--primary); background: rgba(74, 107, 138, 0.03); transform: translateY(-2px); }
 
 .new-icon {
   width: 48px; height: 48px;
@@ -410,7 +403,7 @@
 }
 
 .tema-empty { grid-column: 1 / -1; padding: 24px; text-align: center; }
-.tema-new-card { margin-top: 16px; }
+.tema-new-card { margin-top: 16px; margin-bottom: 40px; }
 
 /* ===== NO DATA ===== */
 .no-data {

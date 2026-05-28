@@ -36,16 +36,6 @@
         }
         <p class="asignatura-subtitle">{{ temas().length }} temas · {{ totalTranscripciones() }} transcripciones</p>
       </div>
-
-      <div class="subject-card subject-card-new asignatura-header-new-btn" (click)="abrirModalCrearTema()">
-        <div class="new-icon">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </div>
-        <span class="new-text">Nuevo Tema</span>
-      </div>
     </div>
 
     @for (tema of temas(); track tema.id_tema) {
@@ -168,6 +158,14 @@
     </div>
     }
 
+    <div class="subject-card subject-card-new tema-new-card" (click)="abrirModalCrearTema()">
+      <div class="new-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+      <span class="new-text">Crear Nuevo Tema</span>
+    </div>
     }
   </main>
 </div>
