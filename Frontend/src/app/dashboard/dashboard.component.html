@@ -9,14 +9,27 @@
         <circle cx="11" cy="11" r="8"/>
         <path d="m21 21-4.35-4.35"/>
       </svg>
-      <input type="text" placeholder="Buscar asignaturas, temas o transcripciones..." [(ngModel)]="searchQuery" (ngModelChange)="onSearch()" class="search-input" />
+      <input type="text" placeholder="Buscar asignaturas, temas o transcripciones..." [(ngModel)]="searchQuery" class="search-input" />
+      @if (resultadosBusqueda().length > 0) {
+        <div class="search-results">
+          @for (r of resultadosBusqueda(); track r.ruta + r.id) {
+            <div class="search-result-item" (click)="irARuta(r.ruta)">
+              <span class="search-result-tipo">{{ r.tipo }}</span>
+              <span class="search-result-titulo">{{ r.titulo }}</span>
+              @if (r.subtitulo) {
+                <span class="search-result-subtitulo">{{ r.subtitulo }}</span>
+              }
+            </div>
+          }
+        </div>
+      }
     </div>
 
     <section class="dash-section">
       <h2 class="section-title">ACTIVIDAD RECIENTE</h2>
       <div class="activity-card">
-        @for (actividad of actividades(); track actividad.titulo) {
-          <div class="activity-item">
+         @for (actividad of actividades(); track actividad.id) {
+           <div class="activity-item" (click)="irARuta('/transcripcion/' + actividad.id)" role="button" tabindex="0">
             <div class="activity-icon">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>

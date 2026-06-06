@@ -27,7 +27,6 @@ interface AsignaturaExtended extends Asignatura {
 export class DashboardComponent implements OnInit, OnDestroy {
   asignaturas = signal<AsignaturaExtended[]>([]);
   transcripciones = signal<Transcripcion[]>([]);
-  searchQuery = '';
 
   menuAbiertoId = signal<number | null>(null);
   modalCrear = false;
@@ -50,10 +49,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
       })
       .slice(0, 5)
       .map(t => ({
+        id: t.id_transcripcion,
         titulo: t.titulo,
         asignatura: this._getAsignaturaName(t.id_tema),
         tiempo: this.formatearFecha(t.fecha_procesamiento)
       }));
+  });
+
+  searchQuery = '';
+  resultadosBusqueda = computed(() => {
+    const q = this.searchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const resultados: { tipo: string; titulo: string; subtitulo?: string; ruta: string; id: number }[] = [];
+
+    for (const asig of this.asignaturas()) {
+      if (asig.nombre.toLowerCase().includes(q)) {
+        resultados.push({ tipo: 'Asignatura', titulo: asig.nombre, subtitulo: asig.profesor, ruta: `/asignatura/${asig.id_asignatura}`, id: asig.id_asignatura });
+      }
+      for (const tema of (asig.temas || [])) {
+        if (tema.nombre.toLowerCase().includes(q)) {
+          resultados.push({ tipo: 'Tema', titulo: tema.nombre, subtitulo: asig.nombre, ruta: `/asignatura/${asig.id_asignatura}`, id: tema.id_tema });
+        }
+      }
+    }
+
+    for (const trans of this.transcripciones()) {
+      if (trans.titulo.toLowerCase().includes(q)) {
+        const nombreAsig = this._getAsignaturaName(trans.id_tema);
+        resultados.push({ tipo: 'Transcripción', titulo: trans.titulo, subtitulo: nombreAsig, ruta: `/transcripcion/${trans.id_transcripcion}`, id: trans.id_transcripcion });
+      }
+    }
+
+    return resultados.slice(0, 8);
   });
 
   constructor(
@@ -132,7 +160,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  onSearch(): void {}
+  irARuta(ruta: string): void {
+    this.searchQuery = '';
+    this.router.navigate([ruta]);
+  }
 
   @HostListener('document:click')
   cerrarMenusGlobal(): void {
