@@ -80,7 +80,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         resultados.push({ tipo: 'Transcripción', titulo: trans.titulo, subtitulo: nombreAsig, ruta: `/transcripcion/${trans.id_transcripcion}`, id: trans.id_transcripcion });
       }
     }
-
+    
     return resultados.slice(0, 8);
   });
 

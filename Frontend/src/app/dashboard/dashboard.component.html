@@ -10,7 +10,7 @@
         <path d="m21 21-4.35-4.35"/>
       </svg>
       <input type="text" placeholder="Buscar asignaturas, temas o transcripciones..." [(ngModel)]="searchQuery" class="search-input" />
-      @if (resultadosBusqueda().length > 0) {
+      @if (searchQuery.trim() && resultadosBusqueda().length > 0) {
         <div class="search-results">
           @for (r of resultadosBusqueda(); track r.ruta + r.id) {
             <div class="search-result-item" (click)="irARuta(r.ruta)">
@@ -21,6 +21,17 @@
               }
             </div>
           }
+        </div>
+      }
+      @if (searchQuery.trim() && resultadosBusqueda().length === 0) {
+        <div class="search-results">
+          <div class="search-no-results">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+            <span>No se encontraron resultados para "{{ searchQuery }}"</span>
+          </div>
         </div>
       }
     </div>

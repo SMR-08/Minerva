@@ -190,6 +190,17 @@
   color: var(--muted-fg);
 }
 
+.search-no-results {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: var(--muted-fg);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  justify-content: center;
+}
+
 /* ===== SECTIONS ===== */
 .dash-section { margin-bottom: 56px; }
 .section-header { margin-bottom: 24px; }
