@@ -1,11 +1,12 @@
 # Minerva — Plataforma de Transcripción Inteligente
 
-> **TFG 2º DAW** — Desarrollo de Aplicaciones Web
-> Fecha: Mayo 2026
+**Autores:** Mateo y Rubén
+**TFG 2º DAW** — Desarrollo de Aplicaciones Web
+**Fecha:** Mayo 2026
 
 ---
 
-## ¿Qué es Minerva?
+## Descripción
 
 Minerva es una plataforma web que transforma grabaciones de clase en apuntes organizados automáticamente. El estudiante graba su clase, sube el audio, y Minerva:
 
@@ -16,13 +17,40 @@ Minerva es una plataforma web que transforma grabaciones de clase en apuntes org
 
 El resultado es una transcripción diarizada donde cada intervención está etiquetada con su hablante, accesible desde cualquier navegador.
 
+| Recurso | URL |
+|----------|-----|
+| Aplicación desplegada | [minerva.mayger.uk](https://minerva.mayger.uk) |
+| Diseño en Figma | [Minerva Web — Figma](https://www.figma.com/design/CMwmHxUjoHDtTMKvl1DHUM/Minerva-Web?node-id=0-1&p=f&t=PrI0trVs9ldK5gI6-0) |
+
+---
+
+## Objetivos del proyecto
+
+El objetivo principal de Minerva es ofrecer una herramienta que permita **transcribir y diarizar grabaciones de clase de hasta 1 hora en menos de 10 minutos**, de forma cómoda y sin fricción para el estudiante. La plataforma abstrae toda la complejidad del procesamiento de audio con IA para que el usuario solo tenga que preocuparse de grabar, subir y leer.
+
+---
+
+## Tutorial de uso
+
+Flujo completo desde que un nuevo usuario llega a la plataforma hasta que obtiene su primera transcripción diarizada:
+
+1. **Landing page** — El usuario accede a [minerva.mayger.uk](https://minerva.mayger.uk) y ve la página de bienvenida con la propuesta de valor y el botón «Comenzar ahora».
+2. **Registro** — Crea su cuenta con nombre, email y contraseña. Si ya tiene cuenta, hace login directamente.
+3. **Dashboard** — Una vez autenticado, llega a su panel principal. Aquí ve sus asignaturas (o un estado vacío si acaba de empezar).
+4. **Crear asignatura** — Crea una asignatura (ej. «Matemáticas») con nombre, profesor y color identificativo.
+5. **Crear tema** — Dentro de la asignatura, crea un tema (ej. «Derivadas»).
+6. **Subir audio** — Dentro del tema, pulsa «Subir audio». Selecciona el archivo (WAV, MP3, M4A, OGG, FLAC), elige idioma (o «auto») y opcionalmente escribe un título. Pulsa «Procesar».
+7. **Seguimiento en tiempo real** — Aparece una tarjeta de transcripción con barra de progreso. El sistema muestra la etapa actual: *Subiendo → Encolado → Procesando (ASR / Diarización / Postprocesado) → Completado → Resumiendo → Listo*.
+8. **Resultado** — Cuando el estado es «Listo», el usuario abre la transcripción y ve el texto diarizado: cada intervención etiquetada con «Profesor» o «Alumno 1», «Alumno 2», etc. También dispone del resumen automático generado por IA.
+9. **Organización continua** — El usuario puede crear más asignaturas, temas y subir más audios. Las transcripciones quedan organizadas jerárquicamente y puede filtrarlas, editarlas o etiquetarlas.
+
 ---
 
 ## Arquitectura General
 
 ```
 ┌─────────────┐         ┌──────────────────────────────────────┐
-│  Angular 17 │  HTTPS  │           Backend Laravel 11          │
+│  Angular 17 │  HTTPS  │           Backend Laravel 12          │
 │    (SPA)    │────────▶│  API REST + Sanctum Auth + Redis Q   │
 │  :4200 dev  │◀────────│  :8001 dev / :9122 prod (gateway)    │
 └─────────────┘         └──────────────┬───────────────────────┘
@@ -66,21 +94,65 @@ El resultado es una transcripción diarizada donde cada intervención está etiq
 
 ## Stack Tecnológico
 
-| Capa | Tecnología | Versión | Justificación |
-|------|-----------|---------|---------------|
-| Frontend | Angular (standalone) | 17 | Componentes sin módulos, signals |
-| Backend | Laravel (API REST) | 11 | Sanctum para SPA auth, queues nativas |
-| Base de datos | MariaDB | latest | Compatible MySQL, ligera |
-| Cola | Redis (BRPOP) | 7-alpine | Cola unificada IA ↔ Laravel |
-| IA - ASR | Qwen3-ASR | 0.6B | Transcripción multilengüe con timestamps |
-| IA - Diarización | Senko (pyannote VAD) | — | Identificación de hablantes |
-| IA - Resumen | Qwen3.5-0.8B | — | Resumen estructurado de clases |
-| GPU (producción) | NVIDIA DGX | 4x V100 32GB | Inferencia paralela (UMA) |
-| Contenedores | Docker / docker-compose | — | Orquestación de servicios |
-| Gateway (prod) | Nginx | alpine | Reverse proxy + rate limiting + HTTPS |
-| CI/CD | GitHub Actions | — | Tests automáticos + deploy |
-| IaC | Terraform + AWS | — | ALB + ASG + ACM (HTTPS) |
-| HTTPS | AWS ACM + Cloudflare DNS | — | Certificado gratuito auto-renovable |
+### Infraestructura y servicios
+
+| Capa | Tecnología | Versión |
+|------|-----------|---------|
+| Frontend | Angular (standalone components) | 17.3 |
+| Backend API | Laravel (REST) | 12 |
+| Backend runtime | PHP | 8.2+ |
+| Base de datos | MariaDB | latest |
+| Cola / caché | Redis | 7-alpine |
+| Autenticación | Laravel Sanctum (SPA tokens) | 4.0 |
+| Cola jobs | Laravel Queues (Redis driver) | — |
+| Cliente Redis | Predis | 3.4 |
+| Assets backend | Vite + Tailwind CSS | 7 + 4 |
+| Estilos frontend | CSS3 (component-scoped) | — |
+| Lenguaje frontend | TypeScript | 5.4 |
+| Reactividad | RxJS | 7.8 |
+
+### Modelos de IA
+
+| Modelo | Rol | GPU | VRAM aprox. | Notas |
+|--------|-----|-----|------------|-------|
+| Qwen3-ASR-1.7B | Transcripción | GPU 0 | ~4 GB | Multilengüe, timestamps a nivel de palabra. Configurable a 0.6B para 8 GB VRAM. |
+| Qwen3-ForcedAligner-0.6B | Alineación fonética | GPU 0 | ~2 GB | Word-level forced alignment |
+| Senko (pyannote VAD) | Diarización | GPU 1 | ~3 GB | Identificación de hablantes sin conocer número previo |
+| Qwen3.5-0.8B | Resumen | GPU 2 | ~2 GB | Resumen estructurado en markdown |
+
+### Stack IA (Python)
+
+| Librería | Propósito |
+|----------|----------|
+| FastAPI + Uvicorn | Servidor HTTP asíncrono del worker y microservicios |
+| PyTorch + transformers | Carga e inferencia de modelos HuggingFace |
+| qwen-asr | Wrapper específico de Qwen3-ASR |
+| pyannote-audio | Diarización (VAD + embeddings + clustering) |
+| aiohttp | Cliente HTTP asíncrono para callbacks y descarga |
+| redis-py (async) | Consumo de cola Redis unificada |
+| soundfile | Lectura de metadatos de audio |
+
+### DevOps y calidad
+
+| Herramienta | Uso |
+|-------------|-----|
+| Docker + docker-compose | Contenedores para desarrollo y producción |
+| Nginx (gateway) | Reverse proxy, HTTPS, rate limiting (producción) |
+| GitHub Actions | CI/CD: tests automáticos + deploy |
+| Terraform + AWS | IaC: ALB, ASG, ACM (HTTPS), Security Groups, escalado |
+| AWS ACM + Cloudflare | Certificado HTTPS gratuito auto-renovable |
+| Pest (PHP) | Tests unitarios e integración backend (71 tests) |
+| Playwright | Tests E2E frontend (6 specs, Page Object Model) |
+| Karma + Jasmine | Tests unitarios Angular |
+
+### Hardware de producción
+
+| Recurso | Especificación |
+|---------|---------------|
+| GPU | NVIDIA DGX Station — 4x V100 32 GB |
+| CPU | Intel Xeon (UMA) |
+| Proxy IA | Bravo (nginx, puerto 7897) → Charlie (DGX, puerto 8000) |
+| Servidor app | AWS EC2 con ALB + ASG |
 
 ---
 
@@ -90,12 +162,12 @@ El resultado es una transcripción diarizada donde cada intervención está etiq
 - Docker + Docker Compose
 - NVIDIA GPU con drivers + nvidia-container-toolkit
 - `nvidia-persistenced` activo (el Makefile lo detecta)
-- 8GB+ VRAM (modo compact) o 16GB+ (modo full)
-- 16GB RAM mínimo
+- 8 GB+ VRAM (modo compact, ASR 0.6B) o 16 GB+ (modo full, ASR 1.7B + resumidor)
+- 16 GB RAM mínimo
 
 ### Producción
 - **AWS** (app): EC2 via ALB con HTTPS (ACM) — `https://minerva.mayger.uk`
-- **UMA** (IA): DGX Station 4x V100 32GB (Charlie) + proxy nginx (Bravo)
+- **UMA** (IA): DGX Station 4x V100 32 GB (Charlie) + proxy nginx (Bravo)
 - Docker en ambos (Charlie sin docker-compose, usa scripts)
 - Guía completa: [`docs/DEPLOY.md`](docs/DEPLOY.md)
 
@@ -122,14 +194,70 @@ make health
 
 ### Comandos esenciales
 
+#### Ciclo de vida
+
 ```bash
-make help          # Ver todos los comandos disponibles
-make up            # Levantar servicios
-make down          # Detener servicios
-make health        # Verificar conectividad entre servicios
-make test-backend  # Ejecutar 55 tests (Pest)
-make logs          # Ver logs en tiempo real
-make status        # Estado de contenedores
+make init            # Inicialización completa (crea .env, build, up, migrate, seed)
+make up              # Levantar todos los servicios
+make down            # Detener y eliminar contenedores
+make restart         # Reiniciar todos los servicios
+make build           # Reconstruir imágenes sin caché
+make clean           # Limpiar todo (contenedores + volúmenes + imágenes)
+```
+
+#### Componentes individuales
+
+```bash
+make front-up         # Levantar solo Frontend
+make front-down       # Bajar solo Frontend
+make front-logs       # Logs del Frontend
+make back-up          # Levantar solo Backend (app + db + redis + worker)
+make back-down        # Bajar solo Backend
+make back-logs        # Logs del Backend
+make ia-up            # Levantar solo IA (ASR + Diarizador + Resumidor)
+make ia-down          # Bajar solo IA
+make ia-logs          # Logs de IA
+```
+
+#### Base de datos
+
+```bash
+make migrate          # Ejecutar migraciones
+make seed             # Ejecutar seeders
+make migrate-fresh    # Recrear BD desde cero (DESTRUCTIVO)
+make permisos         # Corregir permisos de storage
+make build-assets     # Compilar assets frontend (solo DEV)
+```
+
+#### Colas y workers
+
+```bash
+make cola-estado      # Ver tareas pendientes en la cola unificada
+make cola-limpiar     # Limpiar jobs fallidos
+make scale-workers N=3 # Escalar workers (N=3)
+make worker-logs      # Ver logs del worker
+make sse-logs         # Ver logs de SSE/callbacks
+```
+
+#### Diagnóstico y acceso
+
+```bash
+make health           # Verificar conectividad entre servicios
+make check-env        # Validar configuración del .env
+make status           # Estado de los contenedores
+make logs             # Ver logs en tiempo real de todos los servicios
+make mode             # Mostrar modo actual (DEV/PROD) y ejemplos
+make shell-backend    # Abrir shell en Laravel
+make shell-frontend   # Abrir shell en Angular
+make shell-db         # Abrir consola MariaDB
+```
+
+#### Testing
+
+```bash
+make test             # Ejecutar todos los tests
+make test-backend     # Ejecutar tests Laravel (Pest, 71 tests)
+make test-e2e         # Ejecutar tests E2E (Playwright)
 ```
 
 ---
@@ -199,7 +327,7 @@ Ver [`docs/DEPLOY.md`](docs/DEPLOY.md) para guía paso a paso.
 
 ```
 Minerva/
-├── Backend/           Laravel 11 API REST (PHP 8.3)
+├── Backend/           Laravel 12 API REST (PHP 8.2+)
 │   ├── app/
 │   │   ├── Models/        8 modelos (Usuario, Asignatura, Tema, Transcripcion...)
 │   │   ├── Http/          Controllers, Requests, Resources, Middleware
@@ -211,17 +339,21 @@ Minerva/
 │   └── config/audio.php   Configuración centralizada de IA/audio
 ├── Frontend/          Angular 17 SPA (standalone components)
 │   └── src/app/
-│       ├── dashboard/         Vista principal
+│       ├── dashboard/         Vista principal con buscador y actividad reciente
 │       ├── asignatura-view/   Detalle de asignatura + temas
 │       ├── transcripcion-view/ Vista diarizada + resumen IA
 │       ├── formulario-subida/  Upload de audio + tracking
+│       ├── landing-page/      Página de bienvenida pública
 │       ├── pipes/             MarkdownPipe (resumen → HTML)
 │       └── services/          Auth, Minerva, SSE, Notification
 ├── IA/                FastAPI (Python) — ASR + Diarización + Resumen
 │   ├── main.py            Orquestador: worker_loop, /estado, procesar_resumen
+│   ├── worker.py           Worker alternativo de cola Redis
 │   ├── procesamiento.py   Post-procesamiento (6 etapas)
-│   ├── ASR/asr.py         Wrapper Qwen3-ASR
-│   ├── DIARIZADOR/        Senko + ffmpeg
+│   ├── logger.py           Logging JSON estructurado
+│   ├── gpu_manager.py      Gestión de carga/descarga de modelos en VRAM
+│   ├── ASR/asr.py         Wrapper Qwen3-ASR + Qwen3-ForcedAligner
+│   ├── DIARIZADOR/        Senko (pyannote VAD + clustering)
 │   └── resumidor/         Microservicio Qwen3.5-0.8B (modo full)
 ├── deploy/
 │   ├── bravo/             Proxy nginx (docker-compose v1)
@@ -255,14 +387,16 @@ Usuario (1) ─────┬───── (*) Asignatura (1) ─── (*) T
 
 | Tabla | Propósito | Campos clave |
 |-------|----------|---------------|
-| `usuarios` | Usuarios del sistema | email, password_hash, id_rol, id_estado |
-| `asignaturas` | Materias del estudiante | nombre, profesor, color_hex, id_usuario |
-| `temas` | Temas dentro de asignatura | nombre, orden, id_asignatura |
-| `transcripciones` | Audio procesado | uuid, estado, texto_plano, texto_diarizado (JSON), progreso |
-| `tags` | Etiquetas personales | nombre, color_hex, id_usuario |
-| `roles` | ADMIN, USUARIO | nombre |
-| `estados_usuario` | ACTIVO, SUSPENDIDO, BANEADO | nombre |
-| `historial_accesos` | Auditoría de login | ip_acceso, user_agent, fecha |
+| `usuarios` | Usuarios del sistema | id_usuario, email, password_hash, nombre_completo, id_rol, id_estado |
+| `asignaturas` | Materias del estudiante | id_asignatura, nombre, profesor, color_hex, id_usuario |
+| `temas` | Temas dentro de asignatura | id_tema, nombre, orden, id_asignatura |
+| `transcripciones` | Audio procesado | id_transcripcion, uuid_referencia, estado, texto_plano, texto_diarizado (JSON), resumen_ia, progreso_porcentaje |
+| `tags` | Etiquetas personales | id_tag, nombre, color_hex, id_usuario |
+| `roles` | ADMIN, USUARIO | id_rol, nombre, descripcion |
+| `estados_usuario` | ACTIVO, SUSPENDIDO, BANEADO | id_estado, nombre |
+| `historial_accesos` | Auditoría de login | id_acceso, ip_acceso, user_agent, fecha_acceso |
+| `transcripciones_tags` | Tabla pivote M:N | id_transcripcion, id_tag |
+| `personal_access_tokens` | Tokens Sanctum | tokenable_type, tokenable_id, token, abilities |
 
 ### Estados de procesamiento
 
@@ -277,46 +411,76 @@ Durante PROCESANDO, se actualizan `progreso_porcentaje` (0-100) y `etapa_actual`
 
 ## API REST
 
-### Autenticación (Sanctum)
+### Endpoints públicos
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/api/register` | POST | — | Registro (nombre, email, password) |
-| `/api/login` | POST | — | Login → devuelve token Sanctum |
-| `/api/logout` | POST | Bearer | Cierra sesión (elimina token) |
-| `/api/user` | GET | Bearer | Datos del usuario autenticado |
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST | `/api/register` | — | Registro de usuario (nombre, email, password) |
+| POST | `/api/login` | — | Inicio de sesión → devuelve token Sanctum |
+| POST | `/api/ia/callback` | X-Callback-Secret | Callback de resultado final de IA |
+| POST | `/api/ia/sse-update` | X-Callback-Secret | Actualización de progreso de IA |
+| GET | `/api/internal/audio-download/{uuid}` | Bearer (secret) | Descarga de audio para el worker IA |
+| GET | `/api/transcripciones/{uuid}/estado` | Token (query param) | SSE polling de progreso |
 
-### Recursos (CRUD)
+### Endpoints protegidos (Bearer Sanctum)
 
-| Recurso | Endpoints | Auth | Notas |
-|---------|-----------|------|-------|
-| Asignaturas | GET/POST/PUT/DELETE `/api/asignaturas` | Bearer | User-scoped via Policy |
-| Temas | GET/POST/PUT/DELETE `/api/temas` | Bearer | Filtro: `?asignatura_id=X` |
-| Tags | GET/POST/DELETE `/api/tags` | Bearer | User-scoped |
-| Transcripciones | GET/PUT/DELETE `/api/transcripciones/{id}` | Bearer | Incluye texto diarizado |
+#### Autenticación y perfil
 
-### Gestión de Usuario
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/logout` | Cerrar sesión (revoca token) |
+| GET | `/api/user` | Datos del usuario autenticado |
+| PATCH | `/api/user/profile` | Actualizar nombre y preferencias |
+| PATCH | `/api/user/password` | Cambiar contraseña |
+| DELETE | `/api/user` | Eliminar cuenta |
+| POST | `/api/sse/token` | Generar token temporal SSE (30s TTL, un solo uso) |
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/api/user/profile` | PATCH | Bearer | Actualizar nombre y email del usuario |
-| `/api/user/password` | PATCH | Bearer | Cambiar contraseña (requiere password_actual + password_nueva) |
-| `/api/user` | DELETE | Bearer | Eliminar cuenta del usuario (acción irreversible) |
+#### CRUD Asignaturas
 
-### Procesamiento de Audio
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/asignaturas` | Listar asignaturas del usuario |
+| POST | `/api/asignaturas` | Crear asignatura |
+| GET | `/api/asignaturas/{id}` | Ver detalle de asignatura |
+| PUT/PATCH | `/api/asignaturas/{id}` | Actualizar asignatura |
+| DELETE | `/api/asignaturas/{id}` | Eliminar asignatura |
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/api/temas/{id}/procesar-audio` | POST | Bearer | Upload multipart (audio + titulo + idioma) |
-| `/api/transcripciones/{uuid}/estado` | GET | Token query | Polling de progreso (cada 2s) |
-| `/api/ia/estado` | GET | Bearer | Health check del servicio IA |
+#### CRUD Temas
 
-### Callbacks internos (IA → Laravel)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/temas` | Listar temas (filtro: `?asignatura_id=X`) |
+| POST | `/api/temas` | Crear tema |
+| GET | `/api/temas/{id}` | Ver detalle de tema |
+| PUT/PATCH | `/api/temas/{id}` | Actualizar tema |
+| DELETE | `/api/temas/{id}` | Eliminar tema |
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/api/ia/callback` | POST | X-Callback-Secret | Resultado final de procesamiento |
-| `/api/ia/sse-update` | POST | X-Callback-Secret | Actualización de progreso |
+#### CRUD Etiquetas
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/tags` | Listar etiquetas del usuario |
+| POST | `/api/tags` | Crear etiqueta |
+| DELETE | `/api/tags/{id}` | Eliminar etiqueta |
+
+#### Procesamiento de audio y transcripciones
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/ia/estado` | Health check del servicio IA |
+| GET | `/api/transcripciones` | Listar transcripciones del usuario |
+| POST | `/api/temas/{id}/procesar-audio` | Subir audio multipart (archivo + título + idioma) |
+| GET | `/api/transcripciones/{id}` | Ver transcripción con segmentos diarizados |
+| PUT | `/api/transcripciones/{id}` | Editar transcripción (título, tags) |
+| DELETE | `/api/transcripciones/{id}` | Eliminar transcripción |
+
+### Endpoints de administración (Bearer + rol ADMIN)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/admin/usuarios` | Crear usuario |
+| PUT/PATCH | `/api/admin/usuarios/{id}` | Actualizar usuario |
+| DELETE | `/api/admin/usuarios/{id}` | Eliminar usuario |
 
 ---
 
@@ -330,21 +494,22 @@ Durante PROCESANDO, se actualizan `progreso_porcentaje` (0-100) y `etapa_actual`
 | 2 | Diarización | Senko (pyannote VAD) | Identifica segmentos por hablante |
 | 3 | Alineación | Custom (60% overlap) | Asigna cada palabra a un hablante |
 | 4 | Suavizado | Custom | Fusiona fragmentos cortos (<1s) |
-| 5 | Corrección | Custom | Resuelve segmentos "DESCONOCIDO" |
+| 5 | Corrección | Custom | Resuelve segmentos «DESCONOCIDO» |
 | 6 | Roles | Custom | Profesor = hablante con más duración |
 
 ### Modelos disponibles
 
 | Modelo | VRAM | GPU | Uso |
 |--------|------|-----|-----|
-| Qwen3-ASR-0.6B | ~2GB | GPU 0 | Transcripción multilengüe |
-| Qwen3-ForcedAligner-0.6B | ~2GB | GPU 0 | Alineación palabra-timestamp |
-| Senko (pyannote) | ~3GB | GPU 1 | Diarización de hablantes |
-| Qwen3.5-0.8B | ~2GB | GPU 2 | Resumen estructurado de clases |
+| Qwen3-ASR-1.7B | ~4 GB | GPU 0 | Transcripción multilengüe (default) |
+| Qwen3-ASR-0.6B | ~2 GB | GPU 0 | Alternativa ligera para 8 GB VRAM |
+| Qwen3-ForcedAligner-0.6B | ~2 GB | GPU 0 | Alineación palabra-timestamp |
+| Senko (pyannote) | ~3 GB | GPU 1 | Diarización de hablantes |
+| Qwen3.5-0.8B | ~2 GB | GPU 2 | Resumen estructurado de clases |
 
 ### Concurrencia
 
-La IA procesa **un audio a la vez** (asyncio.Lock). Los demás se encolan. Esto es intencional: la GPU no puede paralelizar inferencia de modelos grandes sin fragmentar VRAM.
+La IA procesa **un audio a la vez** (asyncio.Semaphore configurable con `GPU_CONCURRENCY`). Los demás se encolan en Redis. Esto es intencional: la GPU no puede paralelizar inferencia de modelos grandes sin fragmentar VRAM.
 
 ---
 
@@ -388,15 +553,15 @@ PHP-FPM no soporta conexiones long-lived eficientemente. Con 20 usuarios concurr
 
 ### ¿Por qué Redis queue en vez de procesamiento síncrono?
 
-El audio puede tardar 30min-2h en procesarse. Un HTTP timeout mataría la conexión. La cola permite reintentos automáticos (3 intentos con backoff exponencial).
+El audio puede tardar 10-20m en procesarse. Un HTTP timeout mataría la conexión. La cola permite reintentos automáticos (3 intentos con backoff exponencial).
 
-### ¿Por qué "Patata Caliente" (streaming directo)?
+### ¿Por qué «Patata Caliente» (streaming directo)?
 
 El audio se envía directamente de Laravel a IA via HTTP multipart. No se usa filesystem compartido. Más simple, menos puntos de fallo.
 
 ### ¿Por qué Qwen3-ASR?
 
-Modelo open-source multilengüe con timestamps a nivel de palabra. Soporta español, inglés, francés, alemán, portugués, italiano, catalán, euskera, gallego. Funciona en GPU consumer (RTX 3070 Ti).
+Modelo open-source multilengüe con timestamps a nivel de palabra. Soporta español, inglés, francés, alemán, portugués, italiano, catalán, euskera, gallego y más de 20 idiomas adicionales.
 
 ### ¿Por qué Senko para diarización?
 
@@ -413,109 +578,36 @@ Combina pyannote VAD con clustering de embeddings. Funciona sin necesidad de sab
 | Auth callbacks IA | Header `X-Callback-Secret` validado con `hash_equals()` |
 | Aislamiento datos | Policies + scoped queries (usuario solo ve lo suyo) |
 | CORS | Configurado por env var, restrictivo en producción |
-| Rate limiting | Throttle en rutas sensibles (login: 10/min, registro: 5/min) |
+| Rate limiting | Throttle en rutas sensibles (login: 30/min, register: 30/min) |
 | Soft deletes | Datos nunca se borran físicamente |
 | Auditoría | HistorialAcceso registra cada login (IP, user-agent) |
 
 ---
 
-## Estado Actual y Roadmap
+## Observabilidad y depuración
 
-### Implementado
+### Modos de ejecución: DEV=1 vs DEV=0
 
-- Autenticación completa (registro, login, logout, admin)
-- CRUD Asignaturas, Temas, Tags con policies
-- Pipeline completo de audio: upload → cola unificada → ASR → diarización → callback
-- Resumen automático con IA (Qwen3.5-0.8B, modo dual: microservicio o local)
-- Frontend funcional con todas las vistas + estados RESUMIENDO/LISTO
-- Markdown pipe para renderizar resúmenes
-- Docker DEV + PROD con profiles
-- Deploy distribuido: AWS (app) + UMA DGX (IA) via proxy
-- HTTPS con AWS ACM + dominio personalizado (minerva.mayger.uk)
-- Cola unificada Redis (BRPOP) — IA consume directamente sin worker PHP
-- Makefile como orquestador completo
-- 71 tests backend + 8 tests arquitectura + E2E Playwright
-- CI/CD con GitHub Actions (tests + deploy automático)
-- Panel de administración web
-- Terraform IaC (ALB + ASG + ACM + scaling)
-- Documentación de despliegue (docs/DEPLOY.md)
+El Makefile orquestador acepta la variable `DEV` para cambiar entre los dos modos de trabajo:
 
-### Pendiente
+| Variable | Modo | Comportamiento |
+|----------|------|---------------|
+| `DEV=1` | **Desarrollo** | Usa `docker-compose.yml`. Hot reload en Angular y Laravel. Debug granular activo. Sin optimizaciones de caché. Puertos expuestos directamente (:4200, :8001, :8002). |
+| `DEV=0` | **Producción** | Usa `docker-compose.production.yml` con profiles. Nginx como gateway único (:9122). Caché de config/route/view. Logs en JSON estructurado. Debug desactivado aunque las variables estén a 1. |
 
-| Feature | Prioridad | Notas |
-|---------|-----------|-------|
-| Mapa mental Mermaid | Baja | Columna existe en BD, stretch goal |
-| Refactor MVC Laravel | Media | 2 fat controllers, enum EstadoTranscripcion, query scopes. Ver `openspec/laravel-refactor.md` |
-| Multi-idioma frontend | Baja | i18n Angular |
-
----
-
-## Configuración de Referencia
-
-### Variables de entorno principales
-
-| Variable | Propósito | Default (dev) |
-|----------|----------|---------------|
-| `DEV` | Modo Makefile | `1` |
-| `GPU_MODE` | compact (8GB) / full (16GB+) | `compact` |
-| `IA_UPLOAD_URL` | Backend → IA | `http://minerva-asr:8000` |
-| `LARAVEL_URL` | IA → Backend (callbacks) | `http://minerva-nginx:80` |
-| `IA_CALLBACK_SECRET` | Auth de callbacks | (generar con openssl) |
-| `MODELO_ASR` | Modelo de transcripción | `Qwen/Qwen3-ASR-0.6B` |
-| `AUDIO_MAX_SIZE_MB` | Tamaño máximo de upload | `2048` (2GB) |
-| `AI_TIMEOUT` | Timeout procesamiento | `7200` (2h) |
-
-### Puertos
-
-| Servicio | Desarrollo | Producción |
-|----------|-----------|------------|
-| Frontend | :4200 | :9122 (via gateway) |
-| Backend API | :8001 | :9122/api (via gateway) |
-| IA (ASR) | :8002 | interno (:8000) |
-| MariaDB | :3307 | interno (:3306) |
-| Redis | :6379 | interno (:6379) |
-| Gateway | — | :9122 |
-
----
-
-## Troubleshooting
-
-### GPU no detectada
 ```bash
-# Verificar nvidia-persistenced
-systemctl status nvidia-persistenced
-# Si está inactivo:
-sudo systemctl start nvidia-persistenced
-sudo systemctl enable nvidia-persistenced
+# Modo actual y ejemplos
+make mode
+
+# Forzar modo producción en cualquier comando
+DEV=0 make init
+DEV=0 make up
+DEV=0 make health
 ```
-
-### Servicios no conectan
-```bash
-make health   # Muestra qué falla
-make check-env  # Valida configuración
-```
-
-### Audio se sube pero no se procesa
-```bash
-make worker-logs   # Ver errores del worker
-make cola-estado   # Ver estado de la cola Redis
-```
-
-### CORS bloqueado
-Verificar que `CORS_ALLOWED_ORIGINS` y `SANCTUM_STATEFUL_DOMAINS` en `.env` coinciden con la URL desde donde accede el frontend.
-
-### Permisos de storage
-```bash
-make permisos   # Corrige ownership y chmod
-```
-
----
-
-## Observabilidad
 
 ### Logging estructurado (Producción)
 
-Todos los servicios emiten logs JSON con un schema base común:
+En modo `DEV=0`, todos los servicios emiten logs JSON con un schema base común:
 
 ```json
 {"timestamp":"2026-05-25T14:30:00Z","level":"info","service":"laravel","trace_id":"abc-123","message":"Transcripcion completada","context":{}}
@@ -537,7 +629,7 @@ docker logs minerva-asr 2>&1 | jq 'select(.trace_id == "abc-123")'
 
 ### Debug granular (Desarrollo)
 
-Cada subsistema tiene su flag independiente en `.env`:
+En modo `DEV=1`, cada subsistema tiene su flag independiente en `.env`:
 
 ```env
 DEBUG_AUDIO=1   # Upload, storage, streaming a IA
@@ -553,7 +645,35 @@ DEBUG_DB=0     # Queries lentas
 tail -f Backend/storage/logs/debug.log
 ```
 
-Seguridad: tokens se muestran truncados, payloads >500 chars se truncan, en producción el debug se ignora aunque la variable esté en 1.
+Seguridad: tokens se muestran truncados, payloads >500 chars se truncan. En producción (`DEV=0`) el debug se ignora aunque las variables estén a 1.
+
+---
+
+## Configuración de Referencia
+
+### Variables de entorno principales
+
+| Variable | Propósito | Default (dev) |
+|----------|----------|---------------|
+| `DEV` | Modo Makefile | `1` |
+| `GPU_MODE` | compact (8GB) / full (16GB+) | `compact` |
+| `IA_UPLOAD_URL` | Backend → IA | `http://minerva-asr:8000` |
+| `LARAVEL_URL` | IA → Backend (callbacks) | `http://minerva-nginx:80` |
+| `IA_CALLBACK_SECRET` | Auth de callbacks | (generar con openssl) |
+| `MODELO_ASR` | Modelo de transcripción | `Qwen/Qwen3-ASR-1.7B` |
+| `AUDIO_MAX_SIZE_MB` | Tamaño máximo de upload | `2048` (2GB) |
+| `AI_TIMEOUT` | Timeout procesamiento | `7200` (2h) |
+
+### Puertos
+
+| Servicio | Desarrollo | Producción |
+|----------|-----------|------------|
+| Frontend | :4200 | :9122 (via gateway) |
+| Backend API | :8001 | :9122/api (via gateway) |
+| IA (ASR) | :8002 | interno (:8000) |
+| MariaDB | :3307 | interno (:3306) |
+| Redis | :6379 | interno (:6379) |
+| Gateway | — | :9122 |
 
 ---
 
