@@ -469,3 +469,15 @@
   .tema-header { flex-direction: column; align-items: flex-start; gap: 12px; }
   .tema-actions { width: 100%; justify-content: flex-end; }
 }
+
+/* Colapsar tema */
+.tema-chevron {
+  margin-left: auto;
+  color: var(--fg-muted, #888);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.tema-chevron-collapsed {
+  transform: rotate(-90deg);
+}

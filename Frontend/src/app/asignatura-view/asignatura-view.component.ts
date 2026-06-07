@@ -26,6 +26,7 @@ export class AsignaturaViewComponent implements OnInit, OnDestroy {
 
   menuTemaId = signal<number | null>(null);
   menuTransId = signal<number | null>(null);
+  temasColapsados = signal<Set<number>>(new Set());
 
   modalCrearTema = false;
   modalEditarTema = false;
@@ -61,7 +62,15 @@ export class AsignaturaViewComponent implements OnInit, OnDestroy {
           next: (temas) => {
             this.temas.set(temas);
             this.minervaService.getTranscripciones().pipe(takeUntil(this.destroy$)).subscribe({
-              next: (trans) => this.transcripciones.set(trans)
+              next: (trans) => {
+                this.transcripciones.set(trans);
+                const sinTranscripciones = new Set(
+                  temas
+                    .filter(t => !trans.some(tr => tr.tema?.id_tema === t.id_tema))
+                    .map(t => t.id_tema)
+                );
+                this.temasColapsados.set(sinTranscripciones);
+              }
             });
           }
         });
@@ -95,6 +104,21 @@ export class AsignaturaViewComponent implements OnInit, OnDestroy {
   cerrarMenusGlobal(): void {
     this.menuTemaId.set(null);
     this.menuTransId.set(null);
+  }
+
+  toggleColapsarTema(temaId: number, event: Event): void {
+    event.stopPropagation();
+    const current = new Set(this.temasColapsados());
+    if (current.has(temaId)) {
+      current.delete(temaId);
+    } else {
+      current.add(temaId);
+    }
+    this.temasColapsados.set(current);
+  }
+
+  esTemaColapsado(temaId: number): boolean {
+    return this.temasColapsados().has(temaId);
   }
 
   toggleMenuTema(temaId: number, event: Event): void {
